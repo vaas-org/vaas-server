@@ -46,8 +46,9 @@ pub struct Issue {
 }
 
 #[derive(Serialize)]
-#[serde(untagged)]
+#[serde(tag = "type")]
 enum OutgoingMessage {
+    #[serde(rename = "issue")]
     Issue(Issue),
 }
 
