@@ -3,6 +3,7 @@ use crate::service::Service;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
+use slog::{debug, error, info, o, warn};
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
@@ -53,15 +54,28 @@ enum OutgoingMessage {
 type WsClientId = usize;
 
 pub struct WsClient {
-    pub id: WsClientId,
-    pub service: Addr<Service>,
+    id: WsClientId,
+    service: Addr<Service>,
+    logger: slog::Logger,
 }
 
 impl WsClient {
+    pub fn new(service: Addr<Service>, logger: slog::Logger) -> WsClient {
+        let id = 0; // TODO: something smart
+        return WsClient {
+            id,
+            service,
+            logger: logger.new(o!("id" => id)),
+        };
+    }
     fn send_json<T: Serialize>(&self, ctx: &mut ws::WebsocketContext<Self>, value: &T) {
         match serde_json::to_string(value) {
             Ok(json) => ctx.text(json),
-            Err(error) => println!("Failed to convert to JSON {:#?}", error),
+            Err(err) => error!(
+                self.logger,
+                "Failed to convert to JSON {error}",
+                error = err.to_string()
+            ),
         }
     }
 }
@@ -70,7 +84,7 @@ impl Actor for WsClient {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        println!("New ws client {:?}", self.id);
+        info!(self.logger, "New ws client");
         let addr = ctx.address();
         self.service.do_send(service::Connect {
             addr: addr.recipient(),
@@ -78,20 +92,25 @@ impl Actor for WsClient {
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
-        println!("Ws client left {:?}", self.id);
+        info!(self.logger, "Ws client left");
     }
 }
 
 // Incoming messages from ws
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
-    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {}
+    fn handle(&mut self, _msg: Result<ws::Message, ws::ProtocolError>, _ctx: &mut Self::Context) {
+        warn!(
+            self.logger,
+            "Handling of incoming WS messages is not implemented"
+        );
+    }
 }
 
 impl Handler<service::ActiveIssue> for WsClient {
     type Result = ();
 
     fn handle(&mut self, msg: service::ActiveIssue, ctx: &mut Self::Context) {
-        println!("Handling ActiveIssue event");
+        debug!(self.logger, "Handling ActiveIssue event");
         let issue = msg.0;
         self.send_json(
             ctx,
@@ -121,7 +140,7 @@ impl Handler<service::ActiveIssue> for WsClient {
                     })
                     .collect(),
                 max_voters: issue.max_voters,
-                show_distribution: issue.show_distribution
+                show_distribution: issue.show_distribution,
             }),
         )
     }

@@ -1,4 +1,5 @@
 use actix::prelude::*;
+use slog::{debug, error, info, o, warn};
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -37,8 +38,17 @@ pub struct Issue {
     pub show_distribution: bool,
 }
 
-#[derive(Default)]
-pub struct Service;
+pub struct Service {
+    logger: slog::Logger
+}
+
+impl Service {
+    pub fn new(logger: slog::Logger) -> Service {
+        Service {
+            logger
+        }
+    }
+}
 
 impl Actor for Service {
     type Context = Context<Self>;
@@ -48,7 +58,7 @@ impl Handler<Connect> for Service {
     type Result = ();
 
     fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>) {
-        println!("Handling connect");
+        debug!(self.logger, "Handling connect");
         let send_result = msg.addr.do_send(ActiveIssue(Issue {
             id: "0".to_string(),
             title: "coronvorus bad??".to_string(),
@@ -73,7 +83,7 @@ impl Handler<Connect> for Service {
             show_distribution: true,
         }));
         if let Err(err) = send_result {
-            eprintln!("Done goofed while sending issue: {:#?}", err);
+            error!(self.logger, "Done goofed while sending issue: {:#?}", err);
         }
     }
 }
