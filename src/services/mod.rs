@@ -1,6 +1,6 @@
 use crate::websocket::WsClient;
 use actix::prelude::*;
-use slog::{debug, error};
+use slog::{debug, error, info};
 
 pub mod broadcast;
 pub mod issue;
@@ -38,6 +38,10 @@ impl Service {
 
 impl Actor for Service {
     type Context = Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        info!(self.logger, "Service actor started");
+    }
 }
 
 impl Handler<Connect> for Service {

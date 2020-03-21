@@ -1,6 +1,9 @@
 use actix::prelude::*;
+use actix::registry::SystemRegistry;
 use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
+use services::broadcast::BroadcastActor;
+use services::vote::VoteActor;
 use slog::info;
 
 mod log;
@@ -26,18 +29,10 @@ async fn main() -> std::io::Result<()> {
 
     info!(logger, "Starting WS server");
 
-    let vote_logger = logger.clone();
-    Supervisor::start(move |ctx| {
-        let mut act = services::vote::VoteActor::new(vote_logger.clone());
-        act.service_started(ctx);
-        act
-    });
-    let broadcast_logger = logger.clone();
-    Supervisor::start(move |ctx| {
-        let mut act = services::broadcast::BroadcastActor::new(broadcast_logger.clone());
-        act.service_started(ctx);
-        act
-    });
+    // register actors with logger
+    SystemRegistry::set(VoteActor::new(logger.clone()).start());
+    SystemRegistry::set(BroadcastActor::new(logger.clone()).start());
+
     let service_addr = services::Service::new(logger.clone()).start();
     // Create Http server with websocket support
     HttpServer::new(move || {

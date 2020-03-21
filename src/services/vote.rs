@@ -1,5 +1,4 @@
 use super::broadcast::BroadcastActor;
-use crate::log;
 use actix::prelude::*;
 use slog::debug;
 use slog::info;
@@ -50,11 +49,7 @@ impl VoteActor {
 
 impl Default for VoteActor {
     fn default() -> Self {
-        // TODO: We don't want to create new loggers as they may mess up the output by concurrently writing to stdout
-        VoteActor {
-            logger: log::logger(),
-            votes: HashMap::new(),
-        }
+        unimplemented!("Vote actor can't be unitialized using default because it needs a logger")
     }
 }
 

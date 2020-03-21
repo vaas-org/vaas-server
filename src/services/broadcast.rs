@@ -1,6 +1,5 @@
 use super::vote::BroadcastVote;
 use super::{Connect, Disonnect};
-use crate::log;
 use crate::websocket::WsClient;
 use actix::prelude::*;
 use slog;
@@ -26,11 +25,9 @@ impl BroadcastActor {
 
 impl Default for BroadcastActor {
     fn default() -> Self {
-        // TODO: We don't want to create new loggers as they may mess up the output by concurrently writing to stdout
-        BroadcastActor {
-            logger: log::logger(),
-            clients: HashSet::new(),
-        }
+        unimplemented!(
+            "Broadcast actor can't be unitialized using default because it needs a logger"
+        )
     }
 }
 
