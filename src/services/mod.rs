@@ -1,16 +1,25 @@
+use crate::websocket::WsClient;
 use actix::prelude::*;
 use slog::{debug, error};
 
+pub mod broadcast;
 pub mod issue;
+pub mod vote;
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct ActiveIssue(pub issue::InternalIssue);
 
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct Connect {
-    pub addr: Recipient<ActiveIssue>,
+    pub addr: Addr<WsClient>,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Disonnect {
+    pub addr: Addr<WsClient>,
 }
 
 pub struct Service {
@@ -42,10 +51,7 @@ impl Handler<Connect> for Service {
             .then(move |res, act, _ctx| {
                 match res {
                     Ok(issue) => {
-                        let send_result = msg.addr.do_send(ActiveIssue(issue));
-                        if let Err(err) = send_result {
-                            error!(act.logger, "Done goofed while sending issue: {:#?}", err);
-                        }
+                        msg.addr.do_send(ActiveIssue(issue));
                     }
                     Err(err) => {
                         error!(

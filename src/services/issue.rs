@@ -1,3 +1,4 @@
+use super::vote::InternalVote;
 use actix::prelude::*;
 
 #[derive(Clone)]
@@ -11,12 +12,6 @@ pub enum InternalIssueState {
 pub struct InternalAlternative {
     pub id: String,
     pub title: String,
-}
-
-#[derive(Clone)]
-pub struct InternalVote {
-    pub id: String,
-    pub alternative_id: String,
 }
 
 #[derive(Clone)]
