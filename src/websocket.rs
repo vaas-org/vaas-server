@@ -1,5 +1,5 @@
-use crate::service;
-use crate::service::Service;
+use crate::services;
+use crate::services::Service;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
@@ -86,7 +86,7 @@ impl Actor for WsClient {
     fn started(&mut self, ctx: &mut Self::Context) {
         info!(self.logger, "New ws client");
         let addr = ctx.address();
-        self.service.do_send(service::Connect {
+        self.service.do_send(services::Connect {
             addr: addr.recipient(),
         });
     }
@@ -106,10 +106,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
     }
 }
 
-impl Handler<service::ActiveIssue> for WsClient {
+impl Handler<services::ActiveIssue> for WsClient {
     type Result = ();
 
-    fn handle(&mut self, msg: service::ActiveIssue, ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: services::ActiveIssue, ctx: &mut Self::Context) {
         debug!(self.logger, "Handling ActiveIssue event");
         let issue = msg.0;
         self.send_json(
@@ -119,14 +119,14 @@ impl Handler<service::ActiveIssue> for WsClient {
                 title: issue.title,
                 description: issue.description,
                 state: match issue.state {
-                    service::InternalIssueState::NotStarted => IssueState::NotStarted,
-                    service::InternalIssueState::InProgress => IssueState::InProgress,
-                    service::InternalIssueState::Finished => IssueState::Finished,
+                    services::issue::InternalIssueState::NotStarted => IssueState::NotStarted,
+                    services::issue::InternalIssueState::InProgress => IssueState::InProgress,
+                    services::issue::InternalIssueState::Finished => IssueState::Finished,
                 },
                 alternatives: issue
                     .alternatives
                     .into_iter()
-                    .map(|alt: service::InternalAlternative| Alternative {
+                    .map(|alt: services::issue::InternalAlternative| Alternative {
                         id: alt.id,
                         title: alt.title,
                     })
@@ -134,7 +134,7 @@ impl Handler<service::ActiveIssue> for WsClient {
                 votes: issue
                     .votes
                     .into_iter()
-                    .map(|vote: service::InternalVote| Vote {
+                    .map(|vote: services::issue::InternalVote| Vote {
                         id: vote.id,
                         alternative_id: vote.alternative_id,
                     })

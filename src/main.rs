@@ -4,13 +4,13 @@ use actix_web_actors::ws;
 use slog::info;
 
 mod log;
-mod service;
 mod websocket;
+mod services;
 
 async fn ws_route(
     req: HttpRequest,
     stream: web::Payload,
-    service_addr: web::Data<Addr<service::Service>>,
+    service_addr: web::Data<Addr<services::Service>>,
     logger: web::Data<slog::Logger>,
 ) -> Result<HttpResponse, Error> {
     ws::start(
@@ -23,7 +23,7 @@ async fn ws_route(
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
     let logger = log::logger();
-    let service_addr = service::Service::new(logger.clone()).start();
+    let service_addr = services::Service::new(logger.clone()).start();
 
     info!(logger, "Starting WS server");
 
