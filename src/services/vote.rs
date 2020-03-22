@@ -1,4 +1,5 @@
 use super::broadcast::BroadcastActor;
+use super::user::UserId;
 use actix::prelude::*;
 use slog::debug;
 use slog::info;
@@ -7,8 +8,6 @@ use uuid::Uuid;
 
 // Types
 
-#[derive(Clone)]
-pub struct UserId(pub String);
 #[derive(Clone)]
 pub struct VoteId(pub String);
 #[derive(Clone, Hash, PartialEq, Eq)]

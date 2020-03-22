@@ -4,6 +4,7 @@ use slog::{debug, error, info};
 
 pub mod broadcast;
 pub mod issue;
+pub mod user;
 pub mod vote;
 
 #[derive(Message)]

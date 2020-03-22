@@ -1,12 +1,17 @@
 use crate::services;
 use crate::services::broadcast::BroadcastActor;
-use crate::services::vote::{AlternativeId, BroadcastVote, IncomingVoteMessage, UserId, VoteActor};
+use crate::services::vote::{AlternativeId, BroadcastVote, IncomingVoteMessage, VoteActor};
+use crate::services::user::{IncomingLoginMessage, UserActor, UserId};
 use crate::services::Service;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
 use slog::{debug, error, info, o, warn};
 
+#[derive(Deserialize)]
+struct IncomingLogin {
+    username: String,
+}
 #[derive(Deserialize)]
 struct IncomingVote {
     alternative_id: String,
@@ -17,6 +22,8 @@ struct IncomingVote {
 enum IncomingMessage {
     #[serde(rename = "vote")]
     Vote(IncomingVote),
+    #[serde(rename = "login")]
+    Login(IncomingLogin)
 }
 
 #[derive(Serialize)]
@@ -131,6 +138,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                             vote_actor.do_send(IncomingVoteMessage(
                                 UserId(user_id),
                                 AlternativeId(alternative_id),
+                            ));
+                        }
+                        IncomingMessage::Login(login) => {
+                            debug!(self.logger, "Incoming login");
+                            let user_actor = UserActor::from_registry();
+                            let username = login.username;
+                            user_actor.do_send(IncomingLoginMessage(
+                                services::user::UserId("aaa".to_string()),
+                                username.clone()
                             ));
                         }
                     }
