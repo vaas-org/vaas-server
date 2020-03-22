@@ -22,6 +22,12 @@ pub struct InternalVote {
 
 // Messages
 
+// IncomingGetMyVote could have Addr<WsClient> arg
+// so that it can respond to messages.. maybe?
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct IncomingGetMyVote(pub UserId);
+
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct IncomingVoteMessage(pub UserId, pub AlternativeId);
@@ -59,6 +65,27 @@ impl Actor for VoteActor {
         info!(self.logger, "Vote actor started");
     }
 }
+
+impl Handler<IncomingGetMyVote> for VoteActor {
+    type Result = ();
+
+    fn handle(&mut self, msg: IncomingGetMyVote, _ctx: &mut Context<Self>) -> Self::Result {
+        debug!(self.logger, "received new client login in VoteActor");
+        let IncomingGetMyVote(user_id) = msg;
+        for (_, alt) in self.votes.clone() {
+            for v in alt {
+                if v.user_id == user_id {
+                    debug!(self.logger, "---👀 got existing vote for user");
+
+                    // @todo: this should be a reply/echo, not a broadcast
+                    let client = BroadcastActor::from_registry();
+                    client.do_send(BroadcastVote(v));
+                }
+            }
+        }
+    }
+}
+
 
 impl Handler<IncomingVoteMessage> for VoteActor {
     type Result = ();

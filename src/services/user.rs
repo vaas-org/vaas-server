@@ -61,6 +61,16 @@ impl Handler<IncomingLoginMessage> for UserActor {
             id: UserId(Uuid::new_v4().to_hyphenated().to_string()),
             username: username.clone(),
         });
+
+        // reference borrows is fun
+        // debug!(self.logger, "{}", format!("users {:?}", self.users));
+
+        // @todo: Should be user_id but hacking it for username from frontend currently
+        let ref username2 = user.username;
+
+        // Ask VoteActor to push out existing vote for user if it exists
+        let vote_actor = VoteActor::from_registry();
+        vote_actor.do_send(IncomingGetMyVote(UserId(username2.to_owned())));
     }
 }
 
