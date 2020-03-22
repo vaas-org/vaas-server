@@ -1,4 +1,4 @@
-use super::vote::{VoteActor, IncomingGetMyVote};
+use super::vote::{VoteActor, MyVote};
 use actix::prelude::*;
 use slog::debug;
 use slog::info;
@@ -70,7 +70,19 @@ impl Handler<IncomingLoginMessage> for UserActor {
 
         // Ask VoteActor to push out existing vote for user if it exists
         let vote_actor = VoteActor::from_registry();
-        vote_actor.do_send(IncomingGetMyVote(UserId(username2.to_owned())));
+        vote_actor
+            .send(MyVote(UserId(username2.to_owned())))
+            .into_actor(self)
+            .then(|res, act, _ctx| {
+                match res {
+                    Ok(vote) => {
+                        msg.addr.do_send(MyVote(vote))
+                    }
+                    Err(err) =>
+                        debug!(self.logger, "No current vote for user")
+                }
+            })
+            ;
     }
 }
 
