@@ -1,5 +1,5 @@
 use super::broadcast::BroadcastActor;
-use super::user::UserId;
+use super::client::UserId;
 use actix::prelude::*;
 use slog::debug;
 use slog::info;
@@ -70,25 +70,25 @@ impl Actor for VoteActor {
 #[rtype(result = "InternalVote")]
 pub struct MyVote(pub UserId);
 
-impl Handler<MyVote> for VoteActor {
-    type Result = MessageResult<MyVote>;
+// impl Handler<MyVote> for VoteActor {
+//     type Result = MessageResult<MyVote>;
 
-    fn handle(&mut self, msg: MyVote, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!(self.logger, "received new client login in VoteActor");
-        let MyVote(user_id) = msg;
-        let vote;
-        for (_, alt) in self.votes.clone() {
-            for v in alt {
-                if v.user_id == user_id {
-                    debug!(self.logger, "---👀 got existing vote for user");
+//     fn handle(&mut self, msg: MyVote, _ctx: &mut Context<Self>) -> Self::Result {
+//         debug!(self.logger, "received new client login in VoteActor");
+//         let MyVote(user_id) = msg;
+//         let vote;
+//         for (_, alt) in self.votes.clone() {
+//             for v in alt {
+//                 if v.user_id == user_id {
+//                     debug!(self.logger, "---👀 got existing vote for user");
 
-                    vote = v;
-                }
-            }
-        }
-        return MessageResult(vote);
-    }
-}
+//                     vote = v;
+//                 }
+//             }
+//         }
+//         return MessageResult(vote);
+//     }
+// }
 
 
 impl Handler<IncomingVoteMessage> for VoteActor {

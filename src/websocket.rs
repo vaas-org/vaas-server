@@ -1,8 +1,9 @@
 use crate::services;
 use crate::services::broadcast::BroadcastActor;
+use crate::services::client::ClientActor;
+use crate::services::client::{IncomingNewClient, UserId};
 use crate::services::vote::{AlternativeId, BroadcastVote, IncomingVoteMessage, VoteActor};
-use crate::services::user::{IncomingLoginMessage, UserActor, UserId};
-use crate::services::Service;
+use crate::services::{Login, Service};
 use actix::prelude::*;
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
@@ -10,6 +11,7 @@ use slog::{debug, error, info, o, warn};
 
 #[derive(Deserialize)]
 struct IncomingLogin {
+    user_id: String,
     username: String,
 }
 #[derive(Deserialize)]
@@ -50,6 +52,12 @@ struct OutgoingVote {
 }
 
 #[derive(Serialize)]
+struct OutgoingClient {
+    id: String,
+    username: String,
+}
+
+#[derive(Serialize)]
 struct Issue {
     id: String,
     title: String,
@@ -68,6 +76,8 @@ enum OutgoingMessage {
     Issue(Issue),
     #[serde(rename = "vote")]
     Vote(OutgoingVote),
+    #[serde(rename = "client")]
+    Client(OutgoingClient),
 }
 
 type WsClientId = usize;
@@ -107,7 +117,8 @@ impl Actor for WsClient {
         let addr = ctx.address();
         let connect = services::Connect { addr };
         self.service.do_send(connect.clone());
-        BroadcastActor::from_registry().do_send(connect);
+        BroadcastActor::from_registry().do_send(connect.clone());
+        ClientActor::from_registry().do_send(connect.clone());
     }
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
@@ -141,13 +152,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                             ));
                         }
                         IncomingMessage::Login(login) => {
-                            debug!(self.logger, "Incoming login");
-                            let user_actor = UserActor::from_registry();
-                            let username = login.username;
-                            user_actor.do_send(IncomingLoginMessage(
-                                services::user::UserId("aaa".to_string()),
-                                username.clone()
-                            ));
+                            debug!(self.logger, "Incoming login {} {}", login.user_id, login.username);
+                            let user_actor = ClientActor::from_registry();
+                            user_actor.do_send(Login{
+                                user_id: login.user_id,
+                                username: login.username,
+                            });
                         }
                     }
                 }
@@ -214,6 +224,24 @@ impl Handler<BroadcastVote> for WsClient {
                 id: vote.id.0,
                 alternative_id: vote.alternative_id.0,
                 user_id: vote.user_id.0,
+            }),
+        )
+    }
+}
+
+impl Handler<IncomingNewClient> for WsClient {
+    type Result = ();
+
+    fn handle(&mut self, msg: IncomingNewClient, ctx: &mut Self::Context) {
+        let client = msg;
+
+        debug!(self.logger, "Sending client details back to client {}-{}", client.0.id, client.0.username);
+
+        self.send_json(
+            ctx,
+            &OutgoingMessage::Client(OutgoingClient{
+                id: client.0.id,
+                username: client.0.username,
             }),
         )
     }
