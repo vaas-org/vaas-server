@@ -66,7 +66,7 @@ impl Handler<Connect> for ClientActor {
         self.clients.insert(msg.addr.to_owned(), client.clone());
 
         // Tell client its ID
-        msg.addr.do_send(IncomingNewClient(client.clone()));
+        msg.addr.do_send(IncomingNewClient(client));
     }
 }
 
