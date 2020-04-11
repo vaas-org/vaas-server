@@ -6,8 +6,6 @@ use slog;
 use slog::{debug, info};
 use std::collections::HashSet;
 
-// Messages
-
 // Actor
 pub struct BroadcastActor {
     logger: slog::Logger,

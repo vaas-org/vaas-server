@@ -3,6 +3,7 @@ use actix::registry::SystemRegistry;
 use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
 use services::broadcast::BroadcastActor;
+use services::client::ClientActor;
 use services::vote::VoteActor;
 use slog::info;
 
@@ -32,6 +33,7 @@ async fn main() -> std::io::Result<()> {
     // register actors with logger
     SystemRegistry::set(VoteActor::new(logger.clone()).start());
     SystemRegistry::set(BroadcastActor::new(logger.clone()).start());
+    SystemRegistry::set(ClientActor::new(logger.clone()).start());
 
     let service_addr = services::Service::new(logger.clone()).start();
     // Create Http server with websocket support

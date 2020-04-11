@@ -1,4 +1,5 @@
 use super::broadcast::BroadcastActor;
+use super::client::UserId;
 use actix::prelude::*;
 use slog::debug;
 use slog::info;
@@ -7,8 +8,6 @@ use uuid::Uuid;
 
 // Types
 
-#[derive(Clone)]
-pub struct UserId(pub String);
 #[derive(Clone)]
 pub struct VoteId(pub String);
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -22,6 +21,12 @@ pub struct InternalVote {
 }
 
 // Messages
+
+// IncomingGetMyVote could have Addr<WsClient> arg
+// so that it can respond to messages.. maybe?
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct IncomingGetMyVote(pub UserId);
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -60,6 +65,31 @@ impl Actor for VoteActor {
         info!(self.logger, "Vote actor started");
     }
 }
+
+#[derive(Message)]
+#[rtype(result = "InternalVote")]
+pub struct MyVote(pub UserId);
+
+// impl Handler<MyVote> for VoteActor {
+//     type Result = MessageResult<MyVote>;
+
+//     fn handle(&mut self, msg: MyVote, _ctx: &mut Context<Self>) -> Self::Result {
+//         debug!(self.logger, "received new client login in VoteActor");
+//         let MyVote(user_id) = msg;
+//         let vote;
+//         for (_, alt) in self.votes.clone() {
+//             for v in alt {
+//                 if v.user_id == user_id {
+//                     debug!(self.logger, "---👀 got existing vote for user");
+
+//                     vote = v;
+//                 }
+//             }
+//         }
+//         return MessageResult(vote);
+//     }
+// }
+
 
 impl Handler<IncomingVoteMessage> for VoteActor {
     type Result = ();

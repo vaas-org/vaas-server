@@ -3,6 +3,7 @@ use actix::prelude::*;
 use slog::{debug, error, info};
 
 pub mod broadcast;
+pub mod client;
 pub mod issue;
 pub mod vote;
 
@@ -16,9 +17,16 @@ pub struct Connect {
     pub addr: Addr<WsClient>,
 }
 
+#[derive(Message, Clone)]
+#[rtype(result = "()")]
+pub struct Login {
+    pub user_id: String,
+    pub username: String,
+}
+
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct Disonnect {
+pub struct Disonnect { // 😂
     pub addr: Addr<WsClient>,
 }
 
@@ -49,23 +57,30 @@ impl Handler<Connect> for Service {
 
     fn handle(&mut self, msg: Connect, ctx: &mut Context<Self>) {
         debug!(self.logger, "Handling connect");
+
+        let msg1 = msg.clone();
+
         self.issue_service
-            .send(issue::ActiveIssue)
-            .into_actor(self)
-            .then(move |res, act, _ctx| {
-                match res {
-                    Ok(issue) => {
-                        msg.addr.do_send(ActiveIssue(issue));
-                    }
-                    Err(err) => {
-                        error!(
-                            act.logger,
-                            "Got error response. TODO check what this actually means {:#?}", err
-                        );
-                    }
+        .send(issue::ActiveIssue)
+        .into_actor(self)
+        .then(move |res, act, _ctx| {
+            match res {
+                Ok(issue) => {
+                    msg1.addr.do_send(ActiveIssue(issue));
+                    // Send existing vote ?
+                    // no because we havent logged in yet
                 }
-                fut::ready(())
-            })
-            .spawn(ctx)
+                Err(err) => {
+                    error!(
+                        act.logger,
+                        "Got error response. TODO check what this actually means {:#?}", err
+                    );
+                }
+            }
+            fut::ready(())
+        })
+        .spawn(ctx);
+        
+        
     }
 }
