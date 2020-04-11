@@ -87,7 +87,7 @@ impl Handler<Login> for ClientActor {
         debug!(self.logger, "Incoming login in ClientActor");
 
         // Now we want to connect an existing WsClient to a user by e.g. setting a username
-        for (addr, client) in self.clients.clone() {
+        for (addr, client) in self.clients.iter_mut() {
             // I think we ideally would want this maybe, but I'm not sure how to get Addr in here.
             // if addr != &msg.addr {
             //     continue;
@@ -99,15 +99,11 @@ impl Handler<Login> for ClientActor {
 
             debug!(self.logger, "Found existing client during login woooooohooo");
 
-            let updated_client = InternalClient{
-                id: client.id.clone(),
-                username: msg.username.clone(),
-            };
 
-            self.clients.entry(addr.clone()).or_insert(updated_client.clone());
+            client.username = msg.username.clone();
 
             // Send updated client details back to client
-            addr.do_send(IncomingNewClient(updated_client.clone()));
+            addr.do_send(IncomingNewClient(client.clone()));
 
             // Ask VoteActor to push out existing vote for user if it exists
             // Or maybe do this as a separate message? True message driven
