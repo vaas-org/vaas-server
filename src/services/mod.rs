@@ -38,7 +38,7 @@ pub struct Service {
 impl Service {
     pub fn new(logger: slog::Logger) -> Service {
         Service {
-            logger: logger,
+            logger,
             issue_service: issue::IssueService::mocked().start(),
         }
     }
