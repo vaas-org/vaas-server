@@ -59,7 +59,7 @@ impl Handler<Connect> for ClientActor {
         debug!(self.logger, "Adding new client {}", uuid); // @todo: use real slog
 
         let client = InternalClient{
-            username: "".to_owned(), // we don't know this at this point in time
+            username: None,
             id: uuid,
         };
 
@@ -100,7 +100,7 @@ impl Handler<Login> for ClientActor {
             debug!(self.logger, "Found existing client during login woooooohooo");
 
 
-            client.username = msg.username.clone();
+            client.username = Some(msg.username.clone());
 
             // Send updated client details back to client
             addr.do_send(IncomingNewClient(client.clone()));
@@ -128,7 +128,7 @@ impl Handler<Login> for ClientActor {
 #[derive(Clone)]
 pub struct InternalClient {
     pub id: String,
-    pub username: String,
+    pub username: Option<String>,
 }
 
 #[derive(Message)]

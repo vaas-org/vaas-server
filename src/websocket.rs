@@ -54,7 +54,7 @@ struct OutgoingVote {
 #[derive(Serialize)]
 struct OutgoingClient {
     id: String,
-    username: String,
+    username: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -235,7 +235,14 @@ impl Handler<IncomingNewClient> for WsClient {
     fn handle(&mut self, msg: IncomingNewClient, ctx: &mut Self::Context) {
         let client = msg;
 
-        debug!(self.logger, "Sending client details back to client {}-{}", client.0.id, client.0.username);
+        match client.0.username.clone() {
+            Some(u) => {
+                debug!(self.logger, "Sending client details back to client {} ({})", client.0.id, u);
+            },
+            None => {
+                debug!(self.logger, "Sending client details back to client {}", client.0.id);
+            },
+        };
 
         self.send_json(
             ctx,
