@@ -1,4 +1,4 @@
-use super::{Connect, Login, Disonnect};
+use super::{Connect, Disonnect, Login};
 use crate::websocket::WsClient;
 use actix::prelude::*;
 use slog;
@@ -30,9 +30,7 @@ impl ClientActor {
 
 impl Default for ClientActor {
     fn default() -> Self {
-        unimplemented!(
-            "Client actor can't be unitialized using default because it needs a logger"
-        )
+        unimplemented!("Client actor can't be unitialized using default because it needs a logger")
     }
 }
 
@@ -58,7 +56,7 @@ impl Handler<Connect> for ClientActor {
 
         debug!(self.logger, "Adding new client {}", uuid); // @todo: use real slog
 
-        let client = InternalClient{
+        let client = InternalClient {
             username: None,
             id: uuid,
         };
@@ -83,7 +81,6 @@ impl Handler<Login> for ClientActor {
     type Result = ();
 
     fn handle(&mut self, msg: Login, _ctx: &mut Context<Self>) -> Self::Result {
-
         debug!(self.logger, "Incoming login in ClientActor");
 
         // Now we want to connect an existing WsClient to a user by e.g. setting a username
@@ -97,8 +94,10 @@ impl Handler<Login> for ClientActor {
                 continue;
             }
 
-            debug!(self.logger, "Found existing client during login woooooohooo");
-
+            debug!(
+                self.logger,
+                "Found existing client during login woooooohooo"
+            );
 
             client.username = Some(msg.username.clone());
 

@@ -90,7 +90,6 @@ pub struct MyVote(pub UserId);
 //     }
 // }
 
-
 impl Handler<IncomingVoteMessage> for VoteActor {
     type Result = ();
     fn handle(&mut self, msg: IncomingVoteMessage, _ctx: &mut Context<Self>) -> Self::Result {

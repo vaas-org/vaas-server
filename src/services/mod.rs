@@ -26,7 +26,8 @@ pub struct Login {
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct Disonnect { // 😂
+pub struct Disonnect {
+    // 😂
     pub addr: Addr<WsClient>,
 }
 
@@ -61,26 +62,24 @@ impl Handler<Connect> for Service {
         let msg1 = msg.clone();
 
         self.issue_service
-        .send(issue::ActiveIssue)
-        .into_actor(self)
-        .then(move |res, act, _ctx| {
-            match res {
-                Ok(issue) => {
-                    msg1.addr.do_send(ActiveIssue(issue));
-                    // Send existing vote ?
-                    // no because we havent logged in yet
+            .send(issue::ActiveIssue)
+            .into_actor(self)
+            .then(move |res, act, _ctx| {
+                match res {
+                    Ok(issue) => {
+                        msg1.addr.do_send(ActiveIssue(issue));
+                        // Send existing vote ?
+                        // no because we havent logged in yet
+                    }
+                    Err(err) => {
+                        error!(
+                            act.logger,
+                            "Got error response. TODO check what this actually means {:#?}", err
+                        );
+                    }
                 }
-                Err(err) => {
-                    error!(
-                        act.logger,
-                        "Got error response. TODO check what this actually means {:#?}", err
-                    );
-                }
-            }
-            fut::ready(())
-        })
-        .spawn(ctx);
-        
-        
+                fut::ready(())
+            })
+            .spawn(ctx);
     }
 }

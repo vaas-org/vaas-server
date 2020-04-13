@@ -25,7 +25,7 @@ enum IncomingMessage {
     #[serde(rename = "vote")]
     Vote(IncomingVote),
     #[serde(rename = "login")]
-    Login(IncomingLogin)
+    Login(IncomingLogin),
 }
 
 #[derive(Serialize)]
@@ -152,9 +152,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                             ));
                         }
                         IncomingMessage::Login(login) => {
-                            debug!(self.logger, "Incoming login {} {}", login.user_id, login.username);
+                            debug!(
+                                self.logger,
+                                "Incoming login {} {}", login.user_id, login.username
+                            );
                             let user_actor = ClientActor::from_registry();
-                            user_actor.do_send(Login{
+                            user_actor.do_send(Login {
                                 user_id: login.user_id,
                                 username: login.username,
                             });
@@ -237,16 +240,22 @@ impl Handler<IncomingNewClient> for WsClient {
 
         match client.0.username.clone() {
             Some(u) => {
-                debug!(self.logger, "Sending client details back to client {} ({})", client.0.id, u);
-            },
+                debug!(
+                    self.logger,
+                    "Sending client details back to client {} ({})", client.0.id, u
+                );
+            }
             None => {
-                debug!(self.logger, "Sending client details back to client {}", client.0.id);
-            },
+                debug!(
+                    self.logger,
+                    "Sending client details back to client {}", client.0.id
+                );
+            }
         };
 
         self.send_json(
             ctx,
-            &OutgoingMessage::Client(OutgoingClient{
+            &OutgoingMessage::Client(OutgoingClient {
                 id: client.0.id,
                 username: client.0.username,
             }),
