@@ -2,7 +2,6 @@ use super::vote::BroadcastVote;
 use super::{Connect, Disonnect};
 use crate::websocket::WsClient;
 use actix::prelude::*;
-use slog;
 use slog::{debug, info};
 use std::collections::HashSet;
 

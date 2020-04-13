@@ -95,7 +95,10 @@ impl Handler<IncomingVoteMessage> for VoteActor {
     fn handle(&mut self, msg: IncomingVoteMessage, _ctx: &mut Context<Self>) -> Self::Result {
         debug!(self.logger, "VoteActor handling IncomingVoteMessage");
         let IncomingVoteMessage(user_id, alternative_id) = msg;
-        let votes = self.votes.entry(alternative_id.clone()).or_insert(vec![]);
+        let votes = self
+            .votes
+            .entry(alternative_id.clone())
+            .or_insert_with(Vec::new);
         let vote = InternalVote {
             id: VoteId(Uuid::new_v4().to_hyphenated().to_string()),
             alternative_id,

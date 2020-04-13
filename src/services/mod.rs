@@ -59,15 +59,13 @@ impl Handler<Connect> for Service {
     fn handle(&mut self, msg: Connect, ctx: &mut Context<Self>) {
         debug!(self.logger, "Handling connect");
 
-        let msg1 = msg.clone();
-
         self.issue_service
             .send(issue::ActiveIssue)
             .into_actor(self)
             .then(move |res, act, _ctx| {
                 match res {
                     Ok(issue) => {
-                        msg1.addr.do_send(ActiveIssue(issue));
+                        msg.addr.do_send(ActiveIssue(issue));
                         // Send existing vote ?
                         // no because we havent logged in yet
                     }

@@ -91,11 +91,11 @@ pub struct WsClient {
 impl WsClient {
     pub fn new(service: Addr<Service>, logger: slog::Logger) -> WsClient {
         let id = 0; // TODO: something smart
-        return WsClient {
+        WsClient {
             id,
             service,
             logger: logger.new(o!("id" => id)),
-        };
+        }
     }
     fn send_json<T: Serialize>(&self, ctx: &mut ws::WebsocketContext<Self>, value: &T) {
         match serde_json::to_string(value) {
@@ -118,7 +118,7 @@ impl Actor for WsClient {
         let connect = services::Connect { addr };
         self.service.do_send(connect.clone());
         BroadcastActor::from_registry().do_send(connect.clone());
-        ClientActor::from_registry().do_send(connect.clone());
+        ClientActor::from_registry().do_send(connect);
     }
 
     fn stopped(&mut self, ctx: &mut Self::Context) {

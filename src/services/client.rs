@@ -1,7 +1,6 @@
 use super::{Connect, Disonnect, Login};
 use crate::websocket::WsClient;
 use actix::prelude::*;
-use slog;
 use slog::{debug, info};
 use std::collections::HashMap;
 use uuid::Uuid;

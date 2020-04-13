@@ -1,3 +1,4 @@
+#![warn(clippy::all)]
 use actix::prelude::*;
 use actix::registry::SystemRegistry;
 use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
