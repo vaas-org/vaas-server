@@ -10,6 +10,13 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct VoteId(pub String);
+
+impl VoteId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4().to_hyphenated().to_string())
+    }
+}
+
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub struct AlternativeId(pub String);
 
@@ -45,10 +52,27 @@ pub struct VoteActor {
 
 impl VoteActor {
     pub fn new(logger: slog::Logger) -> Self {
-        VoteActor {
+        Self {
             logger,
             votes: HashMap::new(),
         }
+    }
+
+    fn votes_for_alternative(&mut self, alternative_id: AlternativeId) -> &mut Vec<InternalVote> {
+        self.votes.entry(alternative_id).or_insert_with(Vec::new)
+    }
+
+    pub fn add_vote(&mut self, alternative_id: AlternativeId, user_id: UserId) {
+        let votes = self.votes_for_alternative(alternative_id.clone());
+        let vote = InternalVote {
+            id: VoteId::new(),
+            alternative_id,
+            user_id,
+        };
+        votes.push(vote.clone());
+
+        let broadcast = BroadcastActor::from_registry();
+        broadcast.do_send(BroadcastVote(vote));
     }
 }
 
@@ -95,19 +119,7 @@ impl Handler<IncomingVoteMessage> for VoteActor {
     fn handle(&mut self, msg: IncomingVoteMessage, _ctx: &mut Context<Self>) -> Self::Result {
         debug!(self.logger, "VoteActor handling IncomingVoteMessage");
         let IncomingVoteMessage(user_id, alternative_id) = msg;
-        let votes = self
-            .votes
-            .entry(alternative_id.clone())
-            .or_insert_with(Vec::new);
-        let vote = InternalVote {
-            id: VoteId(Uuid::new_v4().to_hyphenated().to_string()),
-            alternative_id,
-            user_id,
-        };
-        votes.push(vote.clone());
-
-        let broadcast = BroadcastActor::from_registry();
-        broadcast.do_send(BroadcastVote(vote));
+        self.add_vote(alternative_id, user_id);
     }
 }
 
