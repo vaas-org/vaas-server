@@ -54,19 +54,27 @@ impl Handler<Disonnect> for BroadcastActor {
     }
 }
 
-impl Handler<BroadcastVote> for BroadcastActor {
-    type Result = ();
+macro_rules! broadcast_handler {
+    ($message_type:ident) => {
+        impl Handler<$message_type> for BroadcastActor {
+            type Result = ();
 
-    fn handle(&mut self, msg: BroadcastVote, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!(
-            self.logger,
-            "Broadcasting vote to clients. Number of clients: {clients}",
-            clients = self.clients.len()
-        );
-        for client in &self.clients {
-            client.do_send(msg.clone());
+            fn handle(&mut self, msg: $message_type, _ctx: &mut Context<Self>) -> Self::Result {
+                debug!(
+                    self.logger,
+                    "Broadcasting {type} to clients. Number of clients: {clients}",
+                    type = stringify!($message_type),
+                    clients = self.clients.len()
+                );
+                for client in &self.clients {
+                    client.do_send(msg.clone());
+                }
+            }
         }
-    }
+    };
 }
+
+broadcast_handler!(BroadcastVote);
+
 impl SystemService for BroadcastActor {}
 impl Supervised for BroadcastActor {}
