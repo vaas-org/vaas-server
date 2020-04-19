@@ -9,8 +9,13 @@ extern crate slog_term;
 
 // Types
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub struct UserId(pub String);
+impl UserId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4().to_hyphenated().to_string())
+    }
+}
 
 // Actor
 pub struct ClientActor {

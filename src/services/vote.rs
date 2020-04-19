@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 // Types
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VoteId(pub String);
 
 impl VoteId {
@@ -17,10 +17,15 @@ impl VoteId {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub struct AlternativeId(pub String);
+impl AlternativeId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4().to_hyphenated().to_string())
+    }
+}
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct InternalVote {
     pub id: VoteId,
     pub alternative_id: AlternativeId,
@@ -125,3 +130,26 @@ impl Handler<IncomingVoteMessage> for VoteActor {
 
 impl SystemService for VoteActor {}
 impl Supervised for VoteActor {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::log;
+
+    #[actix_rt::test]
+    async fn add_vote() {
+        let mut service = VoteActor::new(log::logger());
+        let alternative = AlternativeId::new();
+        let user = UserId::new();
+
+        let votes = service.votes_for_alternative(alternative.clone());
+        let votes = votes.clone();
+        assert_eq!(votes, []);
+
+        service.add_vote(alternative.clone(), user.clone());
+        let votes = service.votes_for_alternative(alternative.clone());
+        assert_eq!(votes.len(), 1);
+        assert_eq!(votes[0].user_id, user);
+        assert_eq!(votes[0].alternative_id, alternative);
+    }
+}
