@@ -1,8 +1,12 @@
 extern crate vaas_server;
+use actix_codec::Framed;
+use actix_http::ws::Codec;
 use actix_web::{test, App};
 use actix_web_actors::ws;
 use futures::{SinkExt, StreamExt};
+use insta::assert_ron_snapshot;
 use std::time::Duration;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::timeout;
 use vaas_server::{log, server, websocket};
 use websocket::{IncomingMessage, IncomingVote, OutgoingMessage};
@@ -11,22 +15,35 @@ const READ_TIMEOUT_MS: u64 = 200;
 
 macro_rules! frame_message_type {
     ($framed:expr, $message_type:path) => {
-        match timeout(Duration::from_millis(READ_TIMEOUT_MS), $framed.next())
+        match read_message(&mut $framed)
             .await
-            .expect("timeout")
-            .unwrap()
-            .unwrap()
+            .expect("Unable to read ws frame")
         {
-            ws::Frame::Text(item) => {
-                let item: OutgoingMessage = serde_json::from_slice(&item[..]).unwrap();
-                match item {
-                    $message_type(message_type) => message_type,
-                    _ => panic!("Wrong outgoing message type"),
-                }
-            }
-            _ => panic!("Websocket frame should be text"),
+            $message_type(message_type) => message_type,
+            _ => panic!("Wrong outgoing message type"),
         }
     };
+}
+
+async fn read_message(
+    framed: &mut Framed<impl AsyncRead + AsyncWrite, Codec>,
+) -> Option<OutgoingMessage> {
+    let frame = timeout(Duration::from_millis(READ_TIMEOUT_MS), framed.next()).await;
+    // ???
+    match frame.ok()??.unwrap() {
+        ws::Frame::Text(item) => Some(serde_json::from_slice(&item[..]).unwrap()),
+        _ => None,
+    }
+}
+
+async fn read_messages(
+    mut framed: &mut Framed<impl AsyncRead + AsyncWrite, Codec>,
+) -> Vec<OutgoingMessage> {
+    let mut messages = vec![];
+    while let Some(message) = read_message(&mut framed).await {
+        messages.push(message);
+    }
+    messages
 }
 
 #[actix_rt::test]
@@ -69,4 +86,19 @@ async fn test_vote() {
         .unwrap()
         .unwrap();
     assert_eq!(item, ws::Frame::Close(Some(ws::CloseCode::Normal.into())));
+}
+
+#[actix_rt::test]
+async fn test_connect() {
+    // Setup test server
+    let mut srv = test::start(|| {
+        let logger = log::logger();
+        server::register_system_actors(logger.clone());
+        App::new().configure(|app| server::configure(app, logger.clone()))
+    });
+    let mut framed = srv.ws_at("/ws/").await.unwrap();
+
+    let messages = read_messages(&mut framed).await;
+
+    assert_ron_snapshot!(messages, { ".**.id" => "[uuid]" });
 }
