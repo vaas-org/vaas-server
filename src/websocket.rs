@@ -9,26 +9,26 @@ use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
 use slog::{debug, error, info, o, warn};
 
-#[derive(Deserialize)]
-struct IncomingLogin {
+#[derive(Serialize, Deserialize)]
+pub struct IncomingLogin {
     user_id: String,
     username: String,
 }
-#[derive(Deserialize)]
-struct IncomingVote {
-    alternative_id: String,
-    user_id: String, // TODO: should be removed
+#[derive(Serialize, Deserialize)]
+pub struct IncomingVote {
+    pub alternative_id: String,
+    pub user_id: String, // TODO: should be removed
 }
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
-enum IncomingMessage {
+pub enum IncomingMessage {
     #[serde(rename = "vote")]
     Vote(IncomingVote),
     #[serde(rename = "login")]
     Login(IncomingLogin),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 enum IssueState {
     #[serde(rename = "notstarted")]
     NotStarted,
@@ -38,29 +38,29 @@ enum IssueState {
     Finished,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct Alternative {
     id: String,
-    title: String,
+    pub title: String,
 }
 
-#[derive(Serialize)]
-struct OutgoingVote {
+#[derive(Serialize, Deserialize)]
+pub struct OutgoingVote {
     id: String,
-    alternative_id: String,
-    user_id: String,
+    pub alternative_id: String,
+    pub user_id: String,
 }
 
-#[derive(Serialize)]
-struct OutgoingClient {
+#[derive(Serialize, Deserialize)]
+pub struct OutgoingClient {
     id: String,
-    username: Option<String>,
+    pub username: Option<String>,
 }
 
-#[derive(Serialize)]
-struct Issue {
+#[derive(Serialize, Deserialize)]
+pub struct Issue {
     id: String,
-    title: String,
+    pub title: String,
     description: String,
     state: IssueState,
     alternatives: Vec<Alternative>,
@@ -69,9 +69,9 @@ struct Issue {
     show_distribution: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
-enum OutgoingMessage {
+pub enum OutgoingMessage {
     #[serde(rename = "issue")]
     Issue(Issue),
     #[serde(rename = "vote")]
@@ -130,7 +130,7 @@ impl Actor for WsClient {
 
 // Incoming messages from ws
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
-    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, _ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(message) => match message {
                 ws::Message::Text(text) => {
@@ -164,8 +164,18 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                         }
                     }
                 }
-                _ => {
-                    warn!(self.logger, "Client sent something else than text");
+                ws::Message::Close(reason) => {
+                    debug!(
+                        self.logger,
+                        "Got close message from WS. Reason: {:#?}", reason
+                    );
+                    ctx.close(reason)
+                }
+                message => {
+                    warn!(
+                        self.logger,
+                        "Client sent something else than text: {:#?}", message
+                    );
                 }
             },
             Err(err) => {
