@@ -2,12 +2,21 @@ extern crate vaas_server;
 use actix_web::{test, App};
 use actix_web_actors::ws;
 use futures::{SinkExt, StreamExt};
+use std::time::Duration;
+use tokio::time::timeout;
 use vaas_server::{log, server, websocket};
 use websocket::{IncomingMessage, IncomingVote, OutgoingMessage};
 
+const READ_TIMEOUT_MS: u64 = 200;
+
 macro_rules! frame_message_type {
     ($framed:expr, $message_type:path) => {
-        match $framed.next().await.unwrap().unwrap() {
+        match timeout(Duration::from_millis(READ_TIMEOUT_MS), $framed.next())
+            .await
+            .expect("timeout")
+            .unwrap()
+            .unwrap()
+        {
             ws::Frame::Text(item) => {
                 let item: OutgoingMessage = serde_json::from_slice(&item[..]).unwrap();
                 match item {
@@ -54,6 +63,10 @@ async fn test_vote() {
         .await
         .unwrap();
 
-    let item = framed.next().await.unwrap().unwrap();
+    let item = timeout(Duration::from_millis(READ_TIMEOUT_MS), framed.next())
+        .await
+        .expect("timeout")
+        .unwrap()
+        .unwrap();
     assert_eq!(item, ws::Frame::Close(Some(ws::CloseCode::Normal.into())));
 }
