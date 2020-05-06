@@ -8,12 +8,24 @@ use uuid::Uuid;
 
 // Types
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VoteId(pub String);
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub struct AlternativeId(pub String);
 
-#[derive(Clone)]
+impl VoteId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4().to_hyphenated().to_string())
+    }
+}
+
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
+pub struct AlternativeId(pub String);
+impl AlternativeId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4().to_hyphenated().to_string())
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct InternalVote {
     pub id: VoteId,
     pub alternative_id: AlternativeId,
@@ -45,10 +57,27 @@ pub struct VoteActor {
 
 impl VoteActor {
     pub fn new(logger: slog::Logger) -> Self {
-        VoteActor {
+        Self {
             logger,
             votes: HashMap::new(),
         }
+    }
+
+    fn votes_for_alternative(&mut self, alternative_id: AlternativeId) -> &mut Vec<InternalVote> {
+        self.votes.entry(alternative_id).or_insert_with(Vec::new)
+    }
+
+    pub fn add_vote(&mut self, alternative_id: AlternativeId, user_id: UserId) {
+        let votes = self.votes_for_alternative(alternative_id.clone());
+        let vote = InternalVote {
+            id: VoteId::new(),
+            alternative_id,
+            user_id,
+        };
+        votes.push(vote.clone());
+
+        let broadcast = BroadcastActor::from_registry();
+        broadcast.do_send(BroadcastVote(vote));
     }
 }
 
@@ -95,21 +124,32 @@ impl Handler<IncomingVoteMessage> for VoteActor {
     fn handle(&mut self, msg: IncomingVoteMessage, _ctx: &mut Context<Self>) -> Self::Result {
         debug!(self.logger, "VoteActor handling IncomingVoteMessage");
         let IncomingVoteMessage(user_id, alternative_id) = msg;
-        let votes = self
-            .votes
-            .entry(alternative_id.clone())
-            .or_insert_with(Vec::new);
-        let vote = InternalVote {
-            id: VoteId(Uuid::new_v4().to_hyphenated().to_string()),
-            alternative_id,
-            user_id,
-        };
-        votes.push(vote.clone());
-
-        let broadcast = BroadcastActor::from_registry();
-        broadcast.do_send(BroadcastVote(vote));
+        self.add_vote(alternative_id, user_id);
     }
 }
 
 impl SystemService for VoteActor {}
 impl Supervised for VoteActor {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::log;
+
+    #[actix_rt::test]
+    async fn add_vote() {
+        let mut service = VoteActor::new(log::logger());
+        let alternative = AlternativeId::new();
+        let user = UserId::new();
+
+        let votes = service.votes_for_alternative(alternative.clone());
+        let votes = votes.clone();
+        assert_eq!(votes, []);
+
+        service.add_vote(alternative.clone(), user.clone());
+        let votes = service.votes_for_alternative(alternative.clone());
+        assert_eq!(votes.len(), 1);
+        assert_eq!(votes[0].user_id, user);
+        assert_eq!(votes[0].alternative_id, alternative);
+    }
+}
