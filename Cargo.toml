@@ -18,3 +18,9 @@ slog = "2.5.2"
 slog-term = "2.5.0"
 slog-async = "2.5.0"
 uuid = { version = "0.8.1", features = ["v4"] }
+tokio = "0.2.20"
+
+[dev-dependencies]
+insta = { version = "0.16.0", features = ["ron", "redactions"] }
+actix-http = "1.0.1"
+actix-codec = "0.2.0"
