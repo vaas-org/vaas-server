@@ -19,6 +19,8 @@ slog-term = "2.5.0"
 slog-async = "2.5.0"
 uuid = { version = "0.8.1", features = ["v4"] }
 tokio = "0.2.20"
+tracing = "0.1.13"
+tracing-subscriber = "0.2.5"
 
 [dev-dependencies]
 insta = { version = "0.16.0", features = ["ron", "redactions"] }

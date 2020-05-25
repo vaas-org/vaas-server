@@ -1,6 +1,6 @@
 use crate::websocket::WsClient;
 use actix::prelude::*;
-use slog::{debug, error, info};
+use tracing::{debug, error, info};
 
 pub mod broadcast;
 pub mod client;
@@ -32,14 +32,12 @@ pub struct Disonnect {
 }
 
 pub struct Service {
-    logger: slog::Logger,
     issue_service: Addr<issue::IssueService>,
 }
 
 impl Service {
-    pub fn new(logger: slog::Logger) -> Service {
+    pub fn new() -> Service {
         Service {
-            logger,
             issue_service: issue::IssueService::mocked().start(),
         }
     }
@@ -49,7 +47,7 @@ impl Actor for Service {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        info!(self.logger, "Service actor started");
+        info!("Service actor started");
     }
 }
 
@@ -57,7 +55,7 @@ impl Handler<Connect> for Service {
     type Result = ();
 
     fn handle(&mut self, msg: Connect, ctx: &mut Context<Self>) {
-        debug!(self.logger, "Handling connect");
+        debug!("Handling connect");
 
         self.issue_service
             .send(issue::ActiveIssue)
@@ -71,8 +69,8 @@ impl Handler<Connect> for Service {
                     }
                     Err(err) => {
                         error!(
-                            act.logger,
-                            "Got error response. TODO check what this actually means {:#?}", err
+                            "Got error response. TODO check what this actually means {:#?}",
+                            err
                         );
                     }
                 }

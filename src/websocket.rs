@@ -7,7 +7,7 @@ use crate::services::{Login, Service};
 use actix::prelude::*;
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
-use slog::{debug, error, info, o, warn};
+use tracing::{debug, error, info, warn};
 
 #[derive(Serialize, Deserialize)]
 pub struct IncomingLogin {
@@ -80,31 +80,18 @@ pub enum OutgoingMessage {
     Client(OutgoingClient),
 }
 
-type WsClientId = usize;
-
 pub struct WsClient {
-    id: WsClientId,
     service: Addr<Service>,
-    logger: slog::Logger,
 }
 
 impl WsClient {
-    pub fn new(service: Addr<Service>, logger: slog::Logger) -> WsClient {
-        let id = 0; // TODO: something smart
-        WsClient {
-            id,
-            service,
-            logger: logger.new(o!("id" => id)),
-        }
+    pub fn new(service: Addr<Service>) -> WsClient {
+        WsClient { service }
     }
     fn send_json<T: Serialize>(&self, ctx: &mut ws::WebsocketContext<Self>, value: &T) {
         match serde_json::to_string(value) {
             Ok(json) => ctx.text(json),
-            Err(err) => error!(
-                self.logger,
-                "Failed to convert to JSON {error}",
-                error = err.to_string()
-            ),
+            Err(err) => error!("Failed to convert to JSON {error}", error = err.to_string()),
         }
     }
 }
@@ -113,7 +100,7 @@ impl Actor for WsClient {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        info!(self.logger, "New ws client");
+        info!("New ws client");
         let addr = ctx.address();
         let connect = services::Connect { addr };
         self.service.do_send(connect.clone());
@@ -122,7 +109,7 @@ impl Actor for WsClient {
     }
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
-        info!(self.logger, "Ws client left");
+        info!("Ws client left");
         let addr = ctx.address();
         BroadcastActor::from_registry().do_send(services::Disonnect { addr });
     }
@@ -142,7 +129,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                     let m = m.unwrap();
                     match m {
                         IncomingMessage::Vote(vote) => {
-                            debug!(self.logger, "Incoming vote");
+                            debug!("Incoming vote");
                             let vote_actor = VoteActor::from_registry();
                             let user_id = vote.user_id; // TODO: Should not be sent by client
                             let alternative_id = vote.alternative_id;
@@ -152,10 +139,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                             ));
                         }
                         IncomingMessage::Login(login) => {
-                            debug!(
-                                self.logger,
-                                "Incoming login {} {}", login.user_id, login.username
-                            );
+                            debug!("Incoming login {} {}", login.user_id, login.username);
                             let user_actor = ClientActor::from_registry();
                             user_actor.do_send(Login {
                                 user_id: login.user_id,
@@ -165,21 +149,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                     }
                 }
                 ws::Message::Close(reason) => {
-                    debug!(
-                        self.logger,
-                        "Got close message from WS. Reason: {:#?}", reason
-                    );
+                    debug!("Got close message from WS. Reason: {:#?}", reason);
                     ctx.close(reason)
                 }
                 message => {
-                    warn!(
-                        self.logger,
-                        "Client sent something else than text: {:#?}", message
-                    );
+                    warn!("Client sent something else than text: {:#?}", message);
                 }
             },
             Err(err) => {
-                error!(self.logger, "ProtocolError in StreamHandler {:#?}", err);
+                error!("ProtocolError in StreamHandler {:#?}", err);
             }
         }
     }
@@ -189,7 +167,7 @@ impl Handler<services::ActiveIssue> for WsClient {
     type Result = ();
 
     fn handle(&mut self, msg: services::ActiveIssue, ctx: &mut Self::Context) {
-        debug!(self.logger, "Handling ActiveIssue event");
+        debug!("Handling ActiveIssue event");
         let issue = msg.0;
         self.send_json(
             ctx,
@@ -251,15 +229,12 @@ impl Handler<IncomingNewClient> for WsClient {
         match client.0.username.clone() {
             Some(u) => {
                 debug!(
-                    self.logger,
-                    "Sending client details back to client {} ({})", client.0.id, u
+                    "Sending client details back to client {} ({})",
+                    client.0.id, u
                 );
             }
             None => {
-                debug!(
-                    self.logger,
-                    "Sending client details back to client {}", client.0.id
-                );
+                debug!("Sending client details back to client {}", client.0.id);
             }
         };
 
