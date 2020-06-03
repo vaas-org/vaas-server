@@ -1,32 +1,45 @@
 use actix::prelude::*;
+use actix::registry::Registry;
 use actix::registry::SystemRegistry;
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use services::broadcast::BroadcastActor;
 use services::client::ClientActor;
+use services::issue::IssueService;
 use services::vote::VoteActor;
+use tracing::{info, span, Level};
 
 use crate::{services, websocket};
 
-async fn ws_route(
-    req: HttpRequest,
-    stream: web::Payload,
-    service_addr: web::Data<Addr<services::Service>>,
-) -> Result<HttpResponse, Error> {
-    let ws_client = websocket::WsClient::new(service_addr.get_ref().clone());
+async fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
+    let span = span!(Level::INFO, "ws_route");
+    let _enter = span.enter();
+    register_request_actors();
+    let ws_client = websocket::WsClient::new();
     ws::start(ws_client, &req, stream)
 }
 
+pub fn register_request_actors() {
+    info!("Registering request actors");
+    Registry::set(services::Service::new().start());
+}
+
+pub fn register_arbiter_actors() {
+    info!("Registering arbiter actors");
+    Registry::set(IssueService::mocked().start());
+}
+
 pub fn register_system_actors() {
-    // register actors with logger
+    info!("Registering system actors");
     SystemRegistry::set(VoteActor::new().start());
     SystemRegistry::set(BroadcastActor::new().start());
     SystemRegistry::set(ClientActor::new().start());
 }
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    let service_addr = services::Service::new().start();
+    let span = span!(Level::INFO, "my_span");
+    let _enter = span.enter();
+    register_arbiter_actors();
     // websocket
-    cfg.data(service_addr)
-        .service(web::resource("/ws/").to(ws_route));
+    cfg.service(web::resource("/ws/").to(ws_route));
 }

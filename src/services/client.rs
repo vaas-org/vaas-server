@@ -43,7 +43,7 @@ impl Actor for ClientActor {
 }
 
 impl Handler<Connect> for ClientActor {
-    type Result = ();
+    type Result = <Connect as Message>::Result;
 
     // reconnection problem: see if the client exists already? maybe if the client connects and sends Id we can connect them back together somehow?
     // otherwise we'll create a new addr and a new uuid and the client will have to log in again.
@@ -65,6 +65,7 @@ impl Handler<Connect> for ClientActor {
 
         // Tell client its ID
         msg.addr.do_send(IncomingNewClient(client));
+        Ok(())
     }
 }
 

@@ -80,13 +80,11 @@ pub enum OutgoingMessage {
     Client(OutgoingClient),
 }
 
-pub struct WsClient {
-    service: Addr<Service>,
-}
+pub struct WsClient {}
 
 impl WsClient {
-    pub fn new(service: Addr<Service>) -> WsClient {
-        WsClient { service }
+    pub fn new() -> Self {
+        Self {}
     }
     fn send_json<T: Serialize>(&self, ctx: &mut ws::WebsocketContext<Self>, value: &T) {
         match serde_json::to_string(value) {
@@ -103,7 +101,8 @@ impl Actor for WsClient {
         info!("New ws client");
         let addr = ctx.address();
         let connect = services::Connect { addr };
-        self.service.do_send(connect.clone());
+        let service = Service::from_registry();
+        service.do_send(connect.clone());
         BroadcastActor::from_registry().do_send(connect.clone());
         ClientActor::from_registry().do_send(connect);
     }

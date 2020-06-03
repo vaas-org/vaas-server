@@ -30,6 +30,12 @@ pub struct IssueService {
     issue: InternalIssue,
 }
 
+impl Default for IssueService {
+    fn default() -> Self {
+        unimplemented!("Issue actor can't be unitialized using default because it needs a logger")
+    }
+}
+
 impl IssueService {
     pub fn mocked() -> IssueService {
         IssueService {
@@ -75,3 +81,6 @@ impl Handler<ActiveIssue> for IssueService {
         MessageResult(self.issue.clone())
     }
 }
+
+impl Supervised for IssueService {}
+impl ArbiterService for IssueService {}

@@ -35,11 +35,12 @@ impl Actor for BroadcastActor {
 }
 
 impl Handler<Connect> for BroadcastActor {
-    type Result = ();
+    type Result = <Connect as Message>::Result;
 
     fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>) -> Self::Result {
         debug!("Adding new client to broadcast");
         self.clients.insert(msg.addr);
+        Ok(())
     }
 }
 

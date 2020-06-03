@@ -1,5 +1,6 @@
 use crate::websocket::WsClient;
 use actix::prelude::*;
+use actix_interop::{critical_section, with_ctx, FutureInterop};
 use tracing::{debug, error, info};
 
 pub mod broadcast;
@@ -12,7 +13,7 @@ pub mod vote;
 pub struct ActiveIssue(pub issue::InternalIssue);
 
 #[derive(Message, Clone)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<(), ()>")]
 pub struct Connect {
     pub addr: Addr<WsClient>,
 }
@@ -43,6 +44,12 @@ impl Service {
     }
 }
 
+impl Default for Service {
+    fn default() -> Self {
+        unimplemented!("Service actor can't be unitialized using default because it needs a logger")
+    }
+}
+
 impl Actor for Service {
     type Context = Context<Self>;
 
@@ -52,30 +59,29 @@ impl Actor for Service {
 }
 
 impl Handler<Connect> for Service {
-    type Result = ();
+    type Result = ResponseActFuture<Self, <Connect as Message>::Result>;
 
-    fn handle(&mut self, msg: Connect, ctx: &mut Context<Self>) {
-        debug!("Handling connect");
-
-        self.issue_service
-            .send(issue::ActiveIssue)
-            .into_actor(self)
-            .then(move |res, act, _ctx| {
-                match res {
-                    Ok(issue) => {
-                        msg.addr.do_send(ActiveIssue(issue));
-                        // Send existing vote ?
-                        // no because we havent logged in yet
-                    }
-                    Err(err) => {
-                        error!(
-                            "Got error response. TODO check what this actually means {:#?}",
-                            err
-                        );
-                    }
+    fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>) -> Self::Result {
+        async move {
+            let res = with_ctx(|a: &mut Service, _| a.issue_service.send(issue::ActiveIssue)).await;
+            match res {
+                Ok(issue) => {
+                    let _res = msg.addr.send(ActiveIssue(issue)).await;
+                    // Send existing vote ?
+                    // no because we havent logged in yet
                 }
-                fut::ready(())
-            })
-            .spawn(ctx);
+                Err(err) => {
+                    error!(
+                        "Got error response. TODO check what this actually means {:#?}",
+                        err
+                    );
+                }
+            }
+            Ok(())
+        }
+        .interop_actor_boxed(self)
     }
 }
+
+impl Supervised for Service {}
+impl ArbiterService for Service {}
