@@ -50,9 +50,8 @@ async fn read_messages(
 async fn test_vote() {
     // Setup test server
     let mut srv = test::start(|| {
-        let logger = log::logger();
-        server::register_system_actors(logger.clone());
-        App::new().configure(|app| server::configure(app, logger.clone()))
+        server::register_system_actors();
+        App::new().configure(|app| server::configure(app))
     });
     let mut framed = srv.ws_at("/ws/").await.unwrap();
 
@@ -92,9 +91,8 @@ async fn test_vote() {
 async fn test_connect() {
     // Setup test server
     let mut srv = test::start(|| {
-        let logger = log::logger();
-        server::register_system_actors(logger.clone());
-        App::new().configure(|app| server::configure(app, logger.clone()))
+        server::register_system_actors();
+        App::new().configure(|app| server::configure(app))
     });
     let mut framed = srv.ws_at("/ws/").await.unwrap();
 

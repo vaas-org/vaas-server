@@ -135,7 +135,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn add_vote() {
-        let mut service = VoteActor::new(log::logger());
+        let mut service = VoteActor::new();
         let alternative = AlternativeId::new();
         let user = UserId::new();
 
