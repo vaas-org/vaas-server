@@ -25,10 +25,9 @@ pub struct Login {
     pub username: String,
 }
 
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "()")]
-pub struct Disonnect {
-    // 😂
+pub struct Disconnect {
     pub addr: Addr<WsClient>,
 }
 
@@ -56,6 +55,10 @@ impl Actor for Service {
     fn started(&mut self, _ctx: &mut Self::Context) {
         info!("Service actor started");
     }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        info!("Service actor stopped");
+    }
 }
 
 impl Handler<Connect> for Service {
@@ -80,6 +83,14 @@ impl Handler<Connect> for Service {
             Ok(())
         }
         .interop_actor_boxed(self)
+    }
+}
+
+impl Handler<Disconnect> for Service {
+    type Result = ();
+
+    fn handle(&mut self, msg: Disconnect, ctx: &mut Context<Self>) {
+        ctx.stop();
     }
 }
 

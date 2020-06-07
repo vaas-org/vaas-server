@@ -1,4 +1,4 @@
-use super::{Connect, Disonnect, Login};
+use super::{Connect, Disconnect, Login};
 use crate::websocket::WsClient;
 use actix::prelude::*;
 use std::collections::HashMap;
@@ -69,10 +69,10 @@ impl Handler<Connect> for ClientActor {
     }
 }
 
-impl Handler<Disonnect> for ClientActor {
+impl Handler<Disconnect> for ClientActor {
     type Result = ();
 
-    fn handle(&mut self, msg: Disonnect, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Disconnect, _ctx: &mut Context<Self>) -> Self::Result {
         debug!("Removing client from ClientActor");
         self.clients.remove(&msg.addr);
     }

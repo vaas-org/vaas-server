@@ -1,5 +1,5 @@
 use super::vote::BroadcastVote;
-use super::{Connect, Disonnect};
+use super::{Connect, Disconnect};
 use crate::websocket::WsClient;
 use actix::prelude::*;
 use std::collections::HashSet;
@@ -44,10 +44,10 @@ impl Handler<Connect> for BroadcastActor {
     }
 }
 
-impl Handler<Disonnect> for BroadcastActor {
+impl Handler<Disconnect> for BroadcastActor {
     type Result = ();
 
-    fn handle(&mut self, msg: Disonnect, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Disconnect, _ctx: &mut Context<Self>) -> Self::Result {
         debug!("Removing client from broadcast");
         self.clients.remove(&msg.addr);
     }

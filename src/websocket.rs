@@ -110,7 +110,9 @@ impl Actor for WsClient {
     fn stopped(&mut self, ctx: &mut Self::Context) {
         info!("Ws client left");
         let addr = ctx.address();
-        BroadcastActor::from_registry().do_send(services::Disonnect { addr });
+        let disconnect = services::Disconnect { addr };
+        BroadcastActor::from_registry().do_send(disconnect.clone());
+        Service::from_registry().do_send(disconnect);
     }
 }
 
