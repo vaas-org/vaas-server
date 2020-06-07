@@ -4,10 +4,11 @@ use crate::services::client::ClientActor;
 use crate::services::client::{IncomingNewClient, UserId};
 use crate::services::vote::{AlternativeId, BroadcastVote, IncomingVoteMessage, VoteActor};
 use crate::services::{Login, Service};
+use crate::span::SpanMessage;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, span, warn, Level};
 
 #[derive(Serialize, Deserialize)]
 pub struct IncomingLogin {
@@ -98,11 +99,13 @@ impl Actor for WsClient {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        let span = span!(Level::INFO, "ws connect");
+        let _enter = span.enter();
         info!("New ws client");
         let addr = ctx.address();
         let connect = services::Connect { addr };
         let service = Service::from_registry();
-        service.do_send(connect.clone());
+        service.do_send(SpanMessage::new(connect.clone(), span.clone()));
         BroadcastActor::from_registry().do_send(connect.clone());
         ClientActor::from_registry().do_send(connect);
     }

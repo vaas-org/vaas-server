@@ -2008,6 +2008,7 @@ dependencies = [
  "actix-web-actors",
  "futures",
  "insta",
+ "pin-project",
  "serde",
  "serde_json",
  "slog",
