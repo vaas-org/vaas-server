@@ -1,7 +1,8 @@
-use crate::span::{ActorFutureSpanWrap, SpanMessage};
+use crate::message_handler_with_span;
+use crate::span::SpanHandler;
 use crate::websocket::WsClient;
 use actix::prelude::*;
-use actix_interop::{critical_section, with_ctx, FutureInterop};
+use actix_interop::{with_ctx, FutureInterop};
 use std::fmt;
 use tracing::{debug, error, info, instrument, Span};
 
@@ -95,33 +96,21 @@ async fn handle_connect(msg: Connect) -> Result<(), ()> {
     Ok(())
 }
 
-impl Handler<Connect> for Service {
-    type Result = ResponseActFuture<Self, <Connect as Message>::Result>;
+message_handler_with_span! {
+    impl SpanHandler<Connect> for Service {
+        type Result = ResponseActFuture<Self, <Connect as Message>::Result>;
 
-    // #[instrument]
-    fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!("Handling connect");
-        handle_connect(msg).interop_actor_boxed(self)
-    }
-}
-
-impl Handler<SpanMessage<Connect>> for Service {
-    type Result = ResponseActFuture<Self, <Connect as Message>::Result>;
-    fn handle(&mut self, msg: SpanMessage<Connect>, ctx: &mut Context<Self>) -> Self::Result {
-        let SpanMessage { span, msg } = msg;
-        let _enter = span.enter();
-        debug!("Running wrapped span message handler");
-        Box::new(ActorFutureSpanWrap::new(
-            self.handle(msg, ctx),
-            span.clone(),
-        ))
+        fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>, _span: Span) -> Self::Result {
+            debug!("Handling connect");
+            handle_connect(msg).interop_actor_boxed(self)
+        }
     }
 }
 
 impl Handler<Disconnect> for Service {
     type Result = ();
 
-    fn handle(&mut self, msg: Disconnect, ctx: &mut Context<Self>) {
+    fn handle(&mut self, _msg: Disconnect, ctx: &mut Context<Self>) {
         ctx.stop();
     }
 }

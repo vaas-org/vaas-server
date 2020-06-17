@@ -1,5 +1,6 @@
 use super::vote::InternalVote;
 use actix::prelude::*;
+use tracing::info;
 
 #[derive(Clone)]
 pub enum InternalIssueState {
@@ -78,6 +79,7 @@ impl Handler<ActiveIssue> for IssueService {
     type Result = MessageResult<ActiveIssue>;
 
     fn handle(&mut self, _msg: ActiveIssue, _ctx: &mut Context<Self>) -> Self::Result {
+        info!("Sending active issue");
         MessageResult(self.issue.clone())
     }
 }
