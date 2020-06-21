@@ -1,5 +1,6 @@
 use super::vote::InternalVote;
 use actix::prelude::*;
+use tracing::info;
 
 #[derive(Clone)]
 pub enum InternalIssueState {
@@ -28,6 +29,12 @@ pub struct InternalIssue {
 
 pub struct IssueService {
     issue: InternalIssue,
+}
+
+impl Default for IssueService {
+    fn default() -> Self {
+        unimplemented!("Issue actor can't be unitialized using default because it needs a logger")
+    }
 }
 
 impl IssueService {
@@ -72,6 +79,10 @@ impl Handler<ActiveIssue> for IssueService {
     type Result = MessageResult<ActiveIssue>;
 
     fn handle(&mut self, _msg: ActiveIssue, _ctx: &mut Context<Self>) -> Self::Result {
+        info!("Sending active issue");
         MessageResult(self.issue.clone())
     }
 }
+
+impl Supervised for IssueService {}
+impl ArbiterService for IssueService {}

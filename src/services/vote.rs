@@ -1,9 +1,8 @@
 use super::broadcast::BroadcastActor;
 use super::client::UserId;
 use actix::prelude::*;
-use slog::debug;
-use slog::info;
 use std::collections::HashMap;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 // Types
@@ -51,14 +50,12 @@ pub struct BroadcastVote(pub InternalVote);
 // Actor
 
 pub struct VoteActor {
-    logger: slog::Logger,
     votes: HashMap<AlternativeId, Vec<InternalVote>>,
 }
 
 impl VoteActor {
-    pub fn new(logger: slog::Logger) -> Self {
+    pub fn new() -> Self {
         Self {
-            logger,
             votes: HashMap::new(),
         }
     }
@@ -91,7 +88,7 @@ impl Actor for VoteActor {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        info!(self.logger, "Vote actor started");
+        info!("Vote actor started");
     }
 }
 
@@ -103,13 +100,13 @@ pub struct MyVote(pub UserId);
 //     type Result = MessageResult<MyVote>;
 
 //     fn handle(&mut self, msg: MyVote, _ctx: &mut Context<Self>) -> Self::Result {
-//         debug!(self.logger, "received new client login in VoteActor");
+//         debug!("received new client login in VoteActor");
 //         let MyVote(user_id) = msg;
 //         let vote;
 //         for (_, alt) in self.votes.clone() {
 //             for v in alt {
 //                 if v.user_id == user_id {
-//                     debug!(self.logger, "---👀 got existing vote for user");
+//                     debug!("---👀 got existing vote for user");
 
 //                     vote = v;
 //                 }
@@ -122,7 +119,7 @@ pub struct MyVote(pub UserId);
 impl Handler<IncomingVoteMessage> for VoteActor {
     type Result = ();
     fn handle(&mut self, msg: IncomingVoteMessage, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!(self.logger, "VoteActor handling IncomingVoteMessage");
+        debug!("VoteActor handling IncomingVoteMessage");
         let IncomingVoteMessage(user_id, alternative_id) = msg;
         self.add_vote(alternative_id, user_id);
     }
@@ -138,7 +135,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn add_vote() {
-        let mut service = VoteActor::new(log::logger());
+        let mut service = VoteActor::new();
         let alternative = AlternativeId::new();
         let user = UserId::new();
 

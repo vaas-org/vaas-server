@@ -1,11 +1,9 @@
-use super::{Connect, Disonnect, Login};
+use super::{Connect, Disconnect, Login};
 use crate::websocket::WsClient;
 use actix::prelude::*;
-use slog::{debug, info};
 use std::collections::HashMap;
+use tracing::{debug, info};
 use uuid::Uuid;
-
-extern crate slog_term;
 
 // Types
 
@@ -19,14 +17,12 @@ impl UserId {
 
 // Actor
 pub struct ClientActor {
-    logger: slog::Logger,
     clients: HashMap<Addr<WsClient>, InternalClient>,
 }
 
 impl ClientActor {
-    pub fn new(logger: slog::Logger) -> Self {
+    pub fn new() -> Self {
         ClientActor {
-            logger,
             clients: HashMap::new(),
         }
     }
@@ -42,23 +38,23 @@ impl Actor for ClientActor {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        info!(self.logger, "Client actor started");
+        info!("Client actor started");
     }
 }
 
 impl Handler<Connect> for ClientActor {
-    type Result = ();
+    type Result = <Connect as Message>::Result;
 
     // reconnection problem: see if the client exists already? maybe if the client connects and sends Id we can connect them back together somehow?
     // otherwise we'll create a new addr and a new uuid and the client will have to log in again.
     // this is required as we'd like to be able to restart the web socket server for updates while people are connected.
 
     fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!(self.logger, "Adding new client to ClientActor");
+        debug!("Adding new client to ClientActor");
 
         let uuid = Uuid::new_v4().to_hyphenated().to_string();
 
-        debug!(self.logger, "Adding new client {}", uuid); // @todo: use real slog
+        debug!("Adding new client {}", uuid);
 
         let client = InternalClient {
             username: None,
@@ -69,14 +65,15 @@ impl Handler<Connect> for ClientActor {
 
         // Tell client its ID
         msg.addr.do_send(IncomingNewClient(client));
+        Ok(())
     }
 }
 
-impl Handler<Disonnect> for ClientActor {
+impl Handler<Disconnect> for ClientActor {
     type Result = ();
 
-    fn handle(&mut self, msg: Disonnect, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!(self.logger, "Removing client from ClientActor");
+    fn handle(&mut self, msg: Disconnect, _ctx: &mut Context<Self>) -> Self::Result {
+        debug!("Removing client from ClientActor");
         self.clients.remove(&msg.addr);
     }
 }
@@ -85,7 +82,7 @@ impl Handler<Login> for ClientActor {
     type Result = ();
 
     fn handle(&mut self, msg: Login, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!(self.logger, "Incoming login in ClientActor");
+        debug!("Incoming login in ClientActor");
 
         // Now we want to connect an existing WsClient to a user by e.g. setting a username
         for (addr, client) in self.clients.iter_mut() {
@@ -94,14 +91,11 @@ impl Handler<Login> for ClientActor {
             //     continue;
             // }
             if client.id != msg.user_id {
-                debug!(self.logger, "Not it {} vs {}", client.id, msg.user_id);
+                debug!("Not it {} vs {}", client.id, msg.user_id);
                 continue;
             }
 
-            debug!(
-                self.logger,
-                "Found existing client during login woooooohooo"
-            );
+            debug!("Found existing client during login woooooohooo");
 
             client.username = Some(msg.username.clone());
 
@@ -120,7 +114,7 @@ impl Handler<Login> for ClientActor {
             //                 addr.do_send(MyVote(vote))
             //             }
             //             Err(err) =>
-            //                 debug!(self.logger, "No current vote for user")
+            //                 debug!("No current vote for user")
             //         }
             //     })
             //     ;

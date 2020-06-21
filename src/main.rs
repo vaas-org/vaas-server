@@ -1,20 +1,23 @@
 #![warn(clippy::all)]
 use actix_web::{App, HttpServer};
-use slog::info;
+use tracing::{info, Level};
 extern crate vaas_server;
 
-use vaas_server::{log, server};
+use vaas_server::server;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-    let logger = log::logger();
+    server::register_system_actors();
 
-    info!(logger, "Starting server");
+    // Global tracing subscriber
+    tracing_subscriber::fmt()
+        .with_max_level(Level::DEBUG)
+        .init();
 
-    server::register_system_actors(logger.clone());
+    info!("Starting server");
 
     // Create Http server with websocket support
-    HttpServer::new(move || App::new().configure(|app| server::configure(app, logger.clone())))
+    HttpServer::new(move || App::new().configure(|app| server::configure(app)))
         .bind("127.0.0.1:8080")?
         .run()
         .await
