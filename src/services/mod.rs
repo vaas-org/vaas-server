@@ -9,6 +9,7 @@ use tracing::{debug, error, info, instrument, Span};
 pub mod broadcast;
 pub mod client;
 pub mod issue;
+pub mod session;
 pub mod user;
 pub mod vote;
 

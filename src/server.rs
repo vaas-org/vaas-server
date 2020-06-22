@@ -6,7 +6,7 @@ use actix_web_actors::ws;
 use services::broadcast::BroadcastActor;
 use services::client::ClientActor;
 use services::issue::IssueService;
-use services::vote::VoteActor;
+use services::{session::SessionActor, vote::VoteActor};
 use tracing::{info, span, Level};
 
 use crate::{services, websocket};
@@ -34,6 +34,7 @@ pub fn register_system_actors() {
     SystemRegistry::set(VoteActor::new().start());
     SystemRegistry::set(BroadcastActor::new().start());
     SystemRegistry::set(ClientActor::new().start());
+    SystemRegistry::set(SessionActor::default().start());
 }
 
 pub fn configure(cfg: &mut web::ServiceConfig) {

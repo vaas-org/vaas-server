@@ -1,0 +1,35 @@
+---
+source: tests/integration_test.rs
+expression: messages
+---
+[
+  Issue(
+    type: "issue",
+    id: "[uuid]",
+    title: "coronvorus bad??",
+    description: "yes or yes",
+    state: inprogress,
+    alternatives: [
+      Alternative(
+        id: "[uuid]",
+        title: "yes",
+      ),
+      Alternative(
+        id: "[uuid]",
+        title: "other yes",
+      ),
+      Alternative(
+        id: "[uuid]",
+        title: "my name is trump i have control",
+      ),
+    ],
+    votes: [],
+    max_voters: 10,
+    show_distribution: true,
+  ),
+  OutgoingClient(
+    type: "client",
+    id: "[uuid]",
+    username: Some("user"),
+  ),
+]

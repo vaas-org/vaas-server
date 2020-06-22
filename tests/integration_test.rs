@@ -9,7 +9,7 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::timeout;
 use vaas_server::{log, server, websocket};
-use websocket::{IncomingLogin, IncomingMessage, IncomingVote, OutgoingMessage};
+use websocket::{IncomingLogin, IncomingMessage, IncomingReconnect, IncomingVote, OutgoingMessage};
 
 const READ_TIMEOUT_MS: u64 = 200;
 
@@ -64,6 +64,48 @@ async fn test_login_user() {
 
     let messages = read_messages(&mut framed).await;
     assert_ron_snapshot!(messages, { ".**.id" => "[uuid]" });
+}
+
+#[actix_rt::test]
+async fn test_reconnect() {
+    // Setup test server
+    let mut srv = test::start(|| {
+        server::register_system_actors();
+        App::new().configure(|app| server::configure(app))
+    });
+    let mut framed = srv.ws_at("/ws/").await.unwrap();
+
+    // Send user login
+    let message = IncomingMessage::Login(IncomingLogin {
+        username: "user".to_owned(),
+    });
+    let message = serde_json::to_string(&message).unwrap();
+    framed.send(ws::Message::Text(message)).await.unwrap();
+
+    let messages = read_messages(&mut framed).await;
+    assert_ron_snapshot!("reconnect - initial login", messages, { ".**.id" => "[uuid]" });
+
+    // TODO: rewrite to filter?
+    let mut session_id = None;
+    for message in messages {
+        match message {
+            OutgoingMessage::Client(client) => {
+                session_id = Some(client.id);
+                break;
+            }
+            _ => continue,
+        }
+    }
+
+    let mut framed = srv.ws_at("/ws/").await.unwrap();
+    let message = IncomingMessage::Reconnect(IncomingReconnect {
+        session_id: session_id.expect("Session id should exist"),
+    });
+    let message = serde_json::to_string(&message).unwrap();
+    framed.send(ws::Message::Text(message)).await.unwrap();
+
+    let messages = read_messages(&mut framed).await;
+    assert_ron_snapshot!("reconnect - reload", messages, { ".**.id" => "[uuid]" });
 }
 
 #[actix_rt::test]
