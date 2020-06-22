@@ -51,8 +51,18 @@ impl UserManager {
 
 impl Default for UserManager {
     fn default() -> Self {
-        Self {
-            users: HashMap::new(),
-        }
+        let user = InternalUser {
+            id: UserId::new(),
+            username: "user".to_owned(),
+        };
+        let admin = InternalUser {
+            id: UserId::new(),
+            username: "admin".to_owned(),
+        };
+        let users = [(user.id.clone(), user), (admin.id.clone(), admin)]
+            .iter()
+            .cloned()
+            .collect();
+        Self { users }
     }
 }

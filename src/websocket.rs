@@ -14,7 +14,7 @@ use tracing::{debug, error, info, span, warn, Level};
 
 #[derive(Serialize, Deserialize)]
 pub struct IncomingLogin {
-    username: String,
+    pub username: String,
 }
 #[derive(Serialize, Deserialize)]
 pub struct IncomingVote {
