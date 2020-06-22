@@ -3,11 +3,6 @@ source: tests/integration_test.rs
 expression: messages
 ---
 [
-  OutgoingClient(
-    type: "client",
-    id: "[uuid]",
-    username: None,
-  ),
   Issue(
     type: "issue",
     id: "[uuid]",

@@ -63,8 +63,8 @@ async fn test_vote() {
     let message = serde_json::to_string(&message).unwrap();
     framed.send(ws::Message::Text(message)).await.unwrap();
 
-    let client = frame_message_type!(framed, OutgoingMessage::Client);
-    assert_eq!(client.username, None);
+    // let client = frame_message_type!(framed, OutgoingMessage::Client);
+    // assert_eq!(client.username, None);
 
     let issue = frame_message_type!(framed, OutgoingMessage::Issue);
     assert_eq!(issue.title, "coronvorus bad??");

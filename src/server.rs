@@ -21,12 +21,12 @@ async fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse
 
 pub fn register_request_actors() {
     info!("Registering request actors");
-    Registry::set(services::Service::new().start());
 }
 
 pub fn register_arbiter_actors() {
     info!("Registering arbiter actors");
     Registry::set(IssueService::mocked().start());
+    Registry::set(services::Service::new().start());
 }
 
 pub fn register_system_actors() {
