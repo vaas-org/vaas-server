@@ -1,4 +1,4 @@
-use super::vote::InternalVote;
+use crate::managers::vote::InternalVote;
 use actix::prelude::*;
 use tracing::info;
 

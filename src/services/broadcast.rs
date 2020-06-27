@@ -1,5 +1,4 @@
-use super::vote::BroadcastVote;
-use super::{Connect, Disconnect};
+use super::{vote::BroadcastVote, Connect, Disconnect};
 use crate::websocket::WsClient;
 use actix::prelude::*;
 use std::collections::HashSet;

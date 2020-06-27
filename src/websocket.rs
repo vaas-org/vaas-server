@@ -1,19 +1,30 @@
 use crate::services;
 use crate::services::broadcast::BroadcastActor;
 use crate::services::client::ClientActor;
-use crate::services::client::{IncomingNewClient, UserId};
-use crate::services::vote::{AlternativeId, BroadcastVote, IncomingVoteMessage, VoteActor};
+use crate::services::vote::{BroadcastVote, IncomingVoteMessage, VoteActor};
 use crate::services::{Login, Service};
-use crate::span::SpanMessage;
+use crate::{
+    managers::{
+        alternative::AlternativeId,
+        session::{InternalSession, SessionId},
+        user::UserId,
+        vote::InternalVote,
+    },
+    span::SpanMessage,
+};
 use actix::prelude::*;
+use actix_interop::{with_ctx, FutureInterop};
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
+use services::{
+    session::{SaveSession, SessionActor, SessionById},
+    user::{UserActor, UserById},
+};
 use tracing::{debug, error, info, span, warn, Level};
 
 #[derive(Serialize, Deserialize)]
 pub struct IncomingLogin {
-    user_id: String,
-    username: String,
+    pub username: String,
 }
 #[derive(Serialize, Deserialize)]
 pub struct IncomingVote {
@@ -21,12 +32,19 @@ pub struct IncomingVote {
     pub user_id: String, // TODO: should be removed
 }
 #[derive(Serialize, Deserialize)]
+pub struct IncomingReconnect {
+    pub session_id: SessionId,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum IncomingMessage {
     #[serde(rename = "vote")]
     Vote(IncomingVote),
     #[serde(rename = "login")]
     Login(IncomingLogin),
+    #[serde(rename = "reconnect")]
+    Reconnect(IncomingReconnect),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -54,7 +72,7 @@ pub struct OutgoingVote {
 
 #[derive(Serialize, Deserialize)]
 pub struct OutgoingClient {
-    id: String,
+    pub id: SessionId,
     pub username: Option<String>,
 }
 
@@ -81,11 +99,17 @@ pub enum OutgoingMessage {
     Client(OutgoingClient),
 }
 
-pub struct WsClient {}
+pub struct WsClient {
+    session_id: Option<SessionId>,
+    user_id: Option<UserId>,
+}
 
 impl WsClient {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            session_id: None,
+            user_id: None,
+        }
     }
     fn send_json<T: Serialize>(&self, ctx: &mut ws::WebsocketContext<Self>, value: &T) {
         match serde_json::to_string(value) {
@@ -106,16 +130,15 @@ impl Actor for WsClient {
         let connect = services::Connect { addr };
         let service = Service::from_registry();
         service.do_send(SpanMessage::new(connect.clone(), span.clone()));
-        BroadcastActor::from_registry().do_send(connect.clone());
-        ClientActor::from_registry().do_send(connect);
+        BroadcastActor::from_registry().do_send(connect);
     }
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
         info!("Ws client left");
         let addr = ctx.address();
         let disconnect = services::Disconnect { addr };
-        BroadcastActor::from_registry().do_send(disconnect.clone());
-        Service::from_registry().do_send(disconnect);
+        BroadcastActor::from_registry().do_send(disconnect);
+        // Service::from_registry().do_send(disconnect);
     }
 }
 
@@ -143,12 +166,88 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                             ));
                         }
                         IncomingMessage::Login(login) => {
-                            debug!("Incoming login {} {}", login.user_id, login.username);
+                            let span = span!(Level::INFO, "login");
+                            let outer_span = span.clone();
+                            let _enter = outer_span.enter();
+                            debug!("Incoming login {}", login.username);
                             let user_actor = ClientActor::from_registry();
-                            user_actor.do_send(Login {
-                                user_id: login.user_id,
-                                username: login.username,
-                            });
+                            user_actor
+                                .send(SpanMessage::new(
+                                    Login {
+                                        username: login.username,
+                                    },
+                                    span.clone(),
+                                ))
+                                .into_actor(self)
+                                .then(move |res, act: &mut WsClient, ctx| {
+                                    let user = res.unwrap().unwrap();
+                                    if let Some(user) = user {
+                                        let session_id = SessionId::new();
+                                        let session_actor = SessionActor::from_registry();
+                                        session_actor.do_send(SpanMessage::new(
+                                            SaveSession(InternalSession {
+                                                id: session_id.clone(),
+                                                user_id: user.id.clone(),
+                                            }),
+                                            span,
+                                        ));
+                                        act.session_id = Some(session_id.clone());
+                                        act.user_id = Some(user.id);
+                                        act.send_json(
+                                            ctx,
+                                            &OutgoingMessage::Client(OutgoingClient {
+                                                id: session_id,
+                                                username: Some(user.username),
+                                            }),
+                                        );
+                                    }
+                                    fut::ready(())
+                                })
+                                .spawn(ctx);
+                        }
+                        IncomingMessage::Reconnect(IncomingReconnect { session_id }) => {
+                            let span =
+                                span!(Level::INFO, "reconnect", session_id = session_id.0.as_str());
+                            let outer_span = span.clone();
+                            let _enter = outer_span.enter();
+                            debug!("Incoming reconnect");
+                            ctx.spawn(
+                                async move {
+                                    let session_actor = SessionActor::from_registry();
+                                    let res = session_actor
+                                        .send(SpanMessage::new(
+                                            SessionById(session_id.clone()),
+                                            span.clone(),
+                                        ))
+                                        .await;
+                                    let session: Option<InternalSession> = res.unwrap().unwrap();
+                                    if let Some(session) = session {
+                                        with_ctx(|act: &mut WsClient, _| {
+                                            act.session_id = Some(session.id.clone());
+                                            act.user_id = Some(session.user_id.clone());
+                                        });
+                                        let user_actor = UserActor::from_registry();
+                                        let user = user_actor
+                                            .send(SpanMessage::new(
+                                                UserById(session.user_id),
+                                                span.clone(),
+                                            ))
+                                            .await;
+                                        if let Some(user) = user.unwrap().unwrap() {
+                                            with_ctx(|act: &mut WsClient, ctx| {
+                                                act.send_json(
+                                                    ctx,
+                                                    &OutgoingMessage::Client(OutgoingClient {
+                                                        id: session_id,
+                                                        username: Some(user.username),
+                                                    }),
+                                                )
+                                            });
+                                        }
+                                    }
+                                }
+                                .interop_actor_boxed(self),
+                            );
                         }
                     }
                 }
@@ -195,7 +294,7 @@ impl Handler<services::ActiveIssue> for WsClient {
                 votes: issue
                     .votes
                     .into_iter()
-                    .map(|vote: services::vote::InternalVote| OutgoingVote {
+                    .map(|vote: InternalVote| OutgoingVote {
                         id: vote.id.0,
                         alternative_id: vote.alternative_id.0,
                         user_id: vote.user_id.0,
@@ -219,34 +318,6 @@ impl Handler<BroadcastVote> for WsClient {
                 id: vote.id.0,
                 alternative_id: vote.alternative_id.0,
                 user_id: vote.user_id.0,
-            }),
-        )
-    }
-}
-
-impl Handler<IncomingNewClient> for WsClient {
-    type Result = ();
-
-    fn handle(&mut self, msg: IncomingNewClient, ctx: &mut Self::Context) {
-        let client = msg;
-
-        match client.0.username.clone() {
-            Some(u) => {
-                debug!(
-                    "Sending client details back to client {} ({})",
-                    client.0.id, u
-                );
-            }
-            None => {
-                debug!("Sending client details back to client {}", client.0.id);
-            }
-        };
-
-        self.send_json(
-            ctx,
-            &OutgoingMessage::Client(OutgoingClient {
-                id: client.0.id,
-                username: client.0.username,
             }),
         )
     }

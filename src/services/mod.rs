@@ -9,6 +9,8 @@ use tracing::{debug, error, info, instrument, Span};
 pub mod broadcast;
 pub mod client;
 pub mod issue;
+pub mod session;
+pub mod user;
 pub mod vote;
 
 #[derive(Message)]
@@ -28,9 +30,8 @@ impl fmt::Debug for Connect {
 }
 
 #[derive(Message, Clone)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<Option<crate::managers::user::InternalUser>, &'static str>")]
 pub struct Login {
-    pub user_id: String,
     pub username: String,
 }
 

@@ -1,37 +1,12 @@
 use super::broadcast::BroadcastActor;
-use super::client::UserId;
+use crate::managers::{
+    alternative::AlternativeId,
+    user::UserId,
+    vote::{InternalVote, VoteId},
+};
 use actix::prelude::*;
 use std::collections::HashMap;
 use tracing::{debug, info};
-use uuid::Uuid;
-
-// Types
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct VoteId(pub String);
-
-impl VoteId {
-    pub fn new() -> Self {
-        Self(Uuid::new_v4().to_hyphenated().to_string())
-    }
-}
-
-#[derive(Clone, Hash, PartialEq, Eq, Debug)]
-pub struct AlternativeId(pub String);
-impl AlternativeId {
-    pub fn new() -> Self {
-        Self(Uuid::new_v4().to_hyphenated().to_string())
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct InternalVote {
-    pub id: VoteId,
-    pub alternative_id: AlternativeId,
-    pub user_id: UserId,
-}
-
-// Messages
 
 // IncomingGetMyVote could have Addr<WsClient> arg
 // so that it can respond to messages.. maybe?
@@ -131,7 +106,6 @@ impl Supervised for VoteActor {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::log;
 
     #[actix_rt::test]
     async fn add_vote() {
