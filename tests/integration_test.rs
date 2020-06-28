@@ -5,10 +5,14 @@ use actix_web::{test, App};
 use actix_web_actors::ws;
 use futures::{SinkExt, StreamExt};
 use insta::assert_ron_snapshot;
+use sqlx::PgPool;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::timeout;
-use vaas_server::{log, server, websocket};
+use vaas_server::{
+    db::{self, user::UserId},
+    server, websocket,
+};
 use websocket::{IncomingLogin, IncomingMessage, IncomingReconnect, IncomingVote, OutgoingMessage};
 
 const READ_TIMEOUT_MS: u64 = 200;
@@ -46,10 +50,18 @@ async fn read_messages(
     messages
 }
 
+async fn pg_pool() -> PgPool {
+    db::new_pool("postgres://postgres:example@localhost")
+        .await
+        .unwrap()
+}
+
 #[actix_rt::test]
 async fn test_login_user() {
-    // Setup test server
-    let mut srv = test::start(|| {
+    // Setup test serve
+    let pool = pg_pool().await;
+    let mut srv = test::start(move || {
+        server::register_db_actor(pool.clone());
         server::register_system_actors();
         App::new().configure(|app| server::configure(app))
     });
@@ -69,7 +81,9 @@ async fn test_login_user() {
 #[actix_rt::test]
 async fn test_reconnect() {
     // Setup test server
-    let mut srv = test::start(|| {
+    let pool = pg_pool().await;
+    let mut srv = test::start(move || {
+        server::register_db_actor(pool.clone());
         server::register_system_actors();
         App::new().configure(|app| server::configure(app))
     });
@@ -111,15 +125,18 @@ async fn test_reconnect() {
 #[actix_rt::test]
 async fn test_vote() {
     // Setup test server
-    let mut srv = test::start(|| {
+    let pool = pg_pool().await;
+    let mut srv = test::start(move || {
+        server::register_db_actor(pool.clone());
         server::register_system_actors();
         App::new().configure(|app| server::configure(app))
     });
     let mut framed = srv.ws_at("/ws/").await.unwrap();
+    let user_id = UserId::new();
 
     // Send vote
     let message = IncomingMessage::Vote(IncomingVote {
-        user_id: "123".to_string(),
+        user_id: user_id.clone(),
         alternative_id: "1".to_string(),
     });
     let message = serde_json::to_string(&message).unwrap();
@@ -133,7 +150,7 @@ async fn test_vote() {
 
     let vote = frame_message_type!(framed, OutgoingMessage::Vote);
     assert_eq!(vote.alternative_id, "1");
-    assert_eq!(vote.user_id, "123");
+    assert_eq!(vote.user_id, user_id);
 
     // Close connection
     framed
@@ -152,7 +169,9 @@ async fn test_vote() {
 #[actix_rt::test]
 async fn test_connect() {
     // Setup test server
-    let mut srv = test::start(|| {
+    let pool = pg_pool().await;
+    let mut srv = test::start(move || {
+        server::register_db_actor(pool.clone());
         server::register_system_actors();
         App::new().configure(|app| server::configure(app))
     });

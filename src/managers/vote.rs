@@ -1,5 +1,5 @@
 use super::alternative::AlternativeId;
-use crate::managers::user::UserId;
+use crate::db::user::UserId;
 use uuid::Uuid;
 
 // Types

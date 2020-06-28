@@ -1,4 +1,4 @@
-use super::user::UserId;
+use crate::db::user::UserId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;

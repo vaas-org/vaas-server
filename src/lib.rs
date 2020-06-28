@@ -1,3 +1,4 @@
+pub mod db;
 pub mod log;
 pub(crate) mod managers;
 pub mod server;
