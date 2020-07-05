@@ -11,7 +11,7 @@ use vaas_server::{db, server};
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
     let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set. e.g: postgres://postgres:example@localhost");
+        .expect("DATABASE_URL must be set. e.g: postgres://postgres:postgres@localhost");
     let pool = db::new_pool(&database_url).await.unwrap();
     server::register_db_actor(pool);
     server::register_system_actors();

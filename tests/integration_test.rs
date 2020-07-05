@@ -51,7 +51,7 @@ async fn read_messages(
 }
 
 async fn pg_pool() -> PgPool {
-    db::new_pool("postgres://postgres:example@localhost")
+    db::new_pool("postgres://postgres:postgres@localhost")
         .await
         .unwrap()
 }
