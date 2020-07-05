@@ -1,9 +1,13 @@
-use super::{
-    user::{UserActor, UserByUsername},
-    Login,
-};
+use super::Login;
 use crate::span::{SpanHandler, SpanMessage};
-use crate::{managers::user::UserId, message_handler_with_span, websocket::WsClient};
+use crate::{
+    db::{
+        user::{UserByUsername, UserId},
+        DbExecutor,
+    },
+    message_handler_with_span,
+    websocket::WsClient,
+};
 use actix::prelude::*;
 use actix_interop::FutureInterop;
 use std::collections::HashMap;
@@ -46,7 +50,7 @@ message_handler_with_span! {
         fn handle(&mut self, msg: Login, _ctx: &mut Context<Self>, span: Span) -> Self::Result {
             debug!("Incoming login in ClientActor");
             async {
-                let user = UserActor::from_registry().send(SpanMessage::new(UserByUsername(msg.username), span)).await;
+                let user = DbExecutor::from_registry().send(SpanMessage::new(UserByUsername(msg.username), span)).await;
                 match user {
                     Ok(user) => user,
                     Err(_err) => {

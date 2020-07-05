@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Build the docker-compose stack
+      run: docker-compose up -d
     - name: Cache cargo registry
       uses: actions/cache@v1
       with:
@@ -38,6 +40,8 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: build
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost
     - name: Annotate commit with clippy warnings
       uses: actions-rs/clippy-check@v1
       with:
@@ -46,6 +50,8 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost
     - name: Run cargo fmt
       uses: actions-rs/cargo@v1
       with:

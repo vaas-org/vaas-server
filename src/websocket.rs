@@ -4,10 +4,11 @@ use crate::services::client::ClientActor;
 use crate::services::vote::{BroadcastVote, IncomingVoteMessage, VoteActor};
 use crate::services::{Login, Service};
 use crate::{
+    db::user::{UserById, UserId},
+    db::DbExecutor,
     managers::{
         alternative::AlternativeId,
         session::{InternalSession, SessionId},
-        user::UserId,
         vote::InternalVote,
     },
     span::SpanMessage,
@@ -16,10 +17,7 @@ use actix::prelude::*;
 use actix_interop::{with_ctx, FutureInterop};
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
-use services::{
-    session::{SaveSession, SessionActor, SessionById},
-    user::{UserActor, UserById},
-};
+use services::session::{SaveSession, SessionActor, SessionById};
 use tracing::{debug, error, info, span, warn, Level};
 
 #[derive(Serialize, Deserialize)]
@@ -29,7 +27,7 @@ pub struct IncomingLogin {
 #[derive(Serialize, Deserialize)]
 pub struct IncomingVote {
     pub alternative_id: String,
-    pub user_id: String, // TODO: should be removed
+    pub user_id: UserId, // TODO: should be removed
 }
 #[derive(Serialize, Deserialize)]
 pub struct IncomingReconnect {
@@ -67,7 +65,7 @@ struct Alternative {
 pub struct OutgoingVote {
     id: String,
     pub alternative_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -161,7 +159,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                             let user_id = vote.user_id; // TODO: Should not be sent by client
                             let alternative_id = vote.alternative_id;
                             vote_actor.do_send(IncomingVoteMessage(
-                                UserId(user_id),
+                                user_id,
                                 AlternativeId(alternative_id),
                             ));
                         }
@@ -187,12 +185,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                                         session_actor.do_send(SpanMessage::new(
                                             SaveSession(InternalSession {
                                                 id: session_id.clone(),
-                                                user_id: user.id.clone(),
+                                                user_id: user.uuid.clone(),
                                             }),
                                             span,
                                         ));
                                         act.session_id = Some(session_id.clone());
-                                        act.user_id = Some(user.id);
+                                        act.user_id = Some(user.uuid);
                                         act.send_json(
                                             ctx,
                                             &OutgoingMessage::Client(OutgoingClient {
@@ -226,8 +224,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                                             act.session_id = Some(session.id.clone());
                                             act.user_id = Some(session.user_id.clone());
                                         });
-                                        let user_actor = UserActor::from_registry();
-                                        let user = user_actor
+                                        let db_executor = DbExecutor::from_registry();
+                                        let user = db_executor
                                             .send(SpanMessage::new(
                                                 UserById(session.user_id),
                                                 span.clone(),
@@ -297,7 +295,7 @@ impl Handler<services::ActiveIssue> for WsClient {
                     .map(|vote: InternalVote| OutgoingVote {
                         id: vote.id.0,
                         alternative_id: vote.alternative_id.0,
-                        user_id: vote.user_id.0,
+                        user_id: vote.user_id,
                     })
                     .collect(),
                 max_voters: issue.max_voters,
@@ -317,7 +315,7 @@ impl Handler<BroadcastVote> for WsClient {
             &OutgoingMessage::Vote(OutgoingVote {
                 id: vote.id.0,
                 alternative_id: vote.alternative_id.0,
-                user_id: vote.user_id.0,
+                user_id: vote.user_id,
             }),
         )
     }

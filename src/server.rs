@@ -9,7 +9,8 @@ use services::issue::IssueService;
 use services::{session::SessionActor, vote::VoteActor};
 use tracing::{info, span, Level};
 
-use crate::{services, websocket};
+use crate::{db, services, websocket};
+use sqlx::PgPool;
 
 async fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
     let span = span!(Level::INFO, "ws_route");
@@ -17,6 +18,11 @@ async fn ws_route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse
     register_request_actors();
     let ws_client = websocket::WsClient::new();
     ws::start(ws_client, &req, stream)
+}
+
+pub fn register_db_actor(pool: PgPool) {
+    let db_executor = db::DbExecutor(pool);
+    SystemRegistry::set(db_executor.start());
 }
 
 pub fn register_request_actors() {
