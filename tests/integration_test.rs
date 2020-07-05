@@ -3,9 +3,11 @@ use actix_codec::Framed;
 use actix_http::ws::Codec;
 use actix_web::{test, App};
 use actix_web_actors::ws;
+use dotenv::dotenv;
 use futures::{SinkExt, StreamExt};
 use insta::assert_ron_snapshot;
 use sqlx::PgPool;
+use std::env;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::timeout;
@@ -51,9 +53,10 @@ async fn read_messages(
 }
 
 async fn pg_pool() -> PgPool {
-    db::new_pool("postgres://postgres:postgres@localhost")
-        .await
-        .unwrap()
+    // TODO: read from some shared config
+    dotenv().ok();
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL not set");
+    db::new_pool(&database_url).await.unwrap()
 }
 
 #[actix_rt::test]
