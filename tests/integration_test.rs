@@ -70,6 +70,8 @@ async fn test_login_user() {
         App::new().configure(|app| server::configure(app))
     });
     let mut framed = srv.ws_at("/ws/").await.unwrap();
+    // Wait until issue has been sent
+    frame_message_type!(framed, OutgoingMessage::Issue);
 
     // Send user login
     let message = IncomingMessage::Login(IncomingLogin {
@@ -92,6 +94,8 @@ async fn test_reconnect() {
         App::new().configure(|app| server::configure(app))
     });
     let mut framed = srv.ws_at("/ws/").await.unwrap();
+    // Wait until issue has been sent
+    frame_message_type!(framed, OutgoingMessage::Issue);
 
     // Send user login
     let message = IncomingMessage::Login(IncomingLogin {
@@ -116,6 +120,8 @@ async fn test_reconnect() {
     }
 
     let mut framed = srv.ws_at("/ws/").await.unwrap();
+    // Wait until issue has been sent
+    frame_message_type!(framed, OutgoingMessage::Issue);
     let message = IncomingMessage::Reconnect(IncomingReconnect {
         session_id: session_id.expect("Session id should exist"),
     });
@@ -135,7 +141,11 @@ async fn test_vote() {
         server::register_system_actors();
         App::new().configure(|app| server::configure(app))
     });
+
     let mut framed = srv.ws_at("/ws/").await.unwrap();
+    let issue = frame_message_type!(framed, OutgoingMessage::Issue);
+    assert_eq!(issue.title, "coronvorus bad??");
+
     let user_id = UserId::new();
     let alternative_id = AlternativeId::new();
 
@@ -149,9 +159,6 @@ async fn test_vote() {
 
     // let client = frame_message_type!(framed, OutgoingMessage::Client);
     // assert_eq!(client.username, None);
-
-    let issue = frame_message_type!(framed, OutgoingMessage::Issue);
-    assert_eq!(issue.title, "coronvorus bad??");
 
     let vote = frame_message_type!(framed, OutgoingMessage::Vote);
     assert_eq!(vote.alternative_id, alternative_id);
