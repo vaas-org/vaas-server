@@ -3,6 +3,11 @@ source: tests/integration_test.rs
 expression: messages
 ---
 [
+  OutgoingClient(
+    type: "client",
+    id: "[uuid]",
+    username: Some("user"),
+  ),
   Issue(
     type: "issue",
     id: "[uuid]",
@@ -26,10 +31,5 @@ expression: messages
     votes: [],
     max_voters: 10,
     show_distribution: true,
-  ),
-  OutgoingClient(
-    type: "client",
-    id: "[uuid]",
-    username: Some("user"),
   ),
 ]

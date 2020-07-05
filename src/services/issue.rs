@@ -1,34 +1,52 @@
-use crate::managers::vote::InternalVote;
+use crate::message_handler_with_span;
+use crate::{
+    db::{
+        self, alternative::InternalAlternative, issue::InternalIssueState, vote::InternalVote,
+        DbExecutor,
+    },
+    span::{SpanHandler, SpanMessage},
+};
 use actix::prelude::*;
-use tracing::info;
-
-#[derive(Clone)]
-pub enum InternalIssueState {
-    NotStarted,
-    InProgress,
-    Finished,
-}
-
-#[derive(Clone)]
-pub struct InternalAlternative {
-    pub id: String,
-    pub title: String,
-}
+use actix_interop::FutureInterop;
+use db::issue::IssueId;
+use tracing::{debug, info, Span};
 
 #[derive(Clone)]
 pub struct InternalIssue {
-    pub id: String,
+    pub id: IssueId,
     pub title: String,
     pub description: String,
     pub state: InternalIssueState,
     pub alternatives: Vec<InternalAlternative>,
     pub votes: Vec<InternalVote>,
-    pub max_voters: u32,
+    pub max_voters: i32,
     pub show_distribution: bool,
 }
 
-pub struct IssueService {
-    issue: InternalIssue,
+impl InternalIssue {
+    fn from_db(
+        issue: db::issue::InternalIssue,
+        alternatives: Vec<db::alternative::InternalAlternative>,
+    ) -> Self {
+        Self {
+            id: issue.id,
+            title: issue.title,
+            description: issue.description,
+            state: issue.state,
+            max_voters: issue.max_voters,
+            show_distribution: issue.show_distribution,
+            alternatives,
+            votes: vec![],
+        }
+    }
+}
+
+pub struct IssueService {}
+
+impl IssueService {
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
 impl Default for IssueService {
@@ -37,50 +55,33 @@ impl Default for IssueService {
     }
 }
 
-impl IssueService {
-    pub fn mocked() -> IssueService {
-        IssueService {
-            issue: InternalIssue {
-                id: "0".to_owned(),
-                title: "coronvorus bad??".to_owned(),
-                description: "yes or yes".to_owned(),
-                state: InternalIssueState::InProgress,
-                alternatives: vec![
-                    InternalAlternative {
-                        id: "1".to_owned(),
-                        title: "yes".to_owned(),
-                    },
-                    InternalAlternative {
-                        id: "2".to_owned(),
-                        title: "other yes".to_owned(),
-                    },
-                    InternalAlternative {
-                        id: "3".to_owned(),
-                        title: "my name is trump i have control".to_owned(),
-                    },
-                ],
-                votes: vec![],
-                max_voters: 10,
-                show_distribution: true,
-            },
-        }
-    }
-}
-
 impl Actor for IssueService {
     type Context = Context<Self>;
 }
 
 #[derive(Message)]
-#[rtype(result = "InternalIssue")]
+#[rtype(result = "Result<Option<InternalIssue>, &'static str>")]
 pub struct ActiveIssue;
 
-impl Handler<ActiveIssue> for IssueService {
-    type Result = MessageResult<ActiveIssue>;
+message_handler_with_span! {
+    impl SpanHandler<ActiveIssue> for IssueService {
+        type Result = ResponseActFuture<Self, <ActiveIssue as Message>::Result>;
 
-    fn handle(&mut self, _msg: ActiveIssue, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("Sending active issue");
-        MessageResult(self.issue.clone())
+        fn handle(&mut self, _msg: ActiveIssue, _ctx: &mut Context<Self>, span: Span) -> Self::Result {
+            async {
+                info!("Sending active issue");
+                let issue: Option<db::issue::InternalIssue> = DbExecutor::from_registry().send(SpanMessage::new(db::issue::ActiveIssue(), span.clone())).await.unwrap()?;
+                match issue {
+                    Some(issue) => {
+                        debug!("Issue found, retrieving alternatives {:#?}", id = issue.id);
+                        let alternatives: Vec<InternalAlternative> = DbExecutor::from_registry().send(SpanMessage::new(db::alternative::AlternativesForIssueId(issue.id.clone()), span)).await.unwrap().unwrap();
+                        debug!("Alternatives found {}", alternatives.len());
+                        Ok(Some(InternalIssue::from_db(issue, alternatives)))
+                    },
+                    None => Ok(None)
+                }
+            }.interop_actor_boxed(self)
+        }
     }
 }
 

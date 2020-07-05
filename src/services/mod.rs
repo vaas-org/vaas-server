@@ -1,8 +1,9 @@
 use crate::message_handler_with_span;
-use crate::span::SpanHandler;
+use crate::span::{SpanHandler, SpanMessage};
 use crate::websocket::WsClient;
 use actix::prelude::*;
-use actix_interop::{with_ctx, FutureInterop};
+use actix_interop::FutureInterop;
+use issue::IssueService;
 use std::fmt;
 use tracing::{debug, error, info, instrument, Span};
 
@@ -40,9 +41,7 @@ pub struct Disconnect {
     pub addr: Addr<WsClient>,
 }
 
-pub struct Service {
-    issue_service: Addr<issue::IssueService>,
-}
+pub struct Service {}
 
 impl fmt::Debug for Service {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -52,9 +51,7 @@ impl fmt::Debug for Service {
 
 impl Service {
     pub fn new() -> Service {
-        Service {
-            issue_service: issue::IssueService::mocked().start(),
-        }
+        Service {}
     }
 }
 
@@ -77,14 +74,20 @@ impl Actor for Service {
 }
 
 #[instrument]
-async fn handle_connect(msg: Connect) -> Result<(), ()> {
+async fn handle_connect(msg: Connect, span: Span) -> Result<(), ()> {
     info!("Test test");
-    let res = with_ctx(|a: &mut Service, _| a.issue_service.send(issue::ActiveIssue)).await;
+    let res = IssueService::from_registry()
+        .send(SpanMessage::new(issue::ActiveIssue, span))
+        .await
+        .unwrap();
     match res {
-        Ok(issue) => {
+        Ok(Some(issue)) => {
             let _res = msg.addr.send(ActiveIssue(issue)).await;
             // Send existing vote ?
             // no because we havent logged in yet
+        }
+        Ok(None) => {
+            error!("No active issue found! Missing sample data?");
         }
         Err(err) => {
             error!(
@@ -100,9 +103,9 @@ message_handler_with_span! {
     impl SpanHandler<Connect> for Service {
         type Result = ResponseActFuture<Self, <Connect as Message>::Result>;
 
-        fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>, _span: Span) -> Self::Result {
+        fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>, span: Span) -> Self::Result {
             debug!("Handling connect");
-            handle_connect(msg).interop_actor_boxed(self)
+            handle_connect(msg, span).interop_actor_boxed(self)
         }
     }
 }

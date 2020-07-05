@@ -1,4 +1,7 @@
+pub mod alternative;
+pub mod issue;
 pub mod user;
+pub mod vote;
 
 use actix::prelude::*;
 use sqlx::PgPool;

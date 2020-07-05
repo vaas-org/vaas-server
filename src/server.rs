@@ -31,7 +31,7 @@ pub fn register_request_actors() {
 
 pub fn register_arbiter_actors() {
     info!("Registering arbiter actors");
-    Registry::set(IssueService::mocked().start());
+    Registry::set(IssueService::new().start());
     Registry::set(services::Service::new().start());
 }
 
