@@ -9,3 +9,6 @@ services:
       POSTGRES_PASSWORD: example
     ports:
       - 5432:5432
+    volumes:
+      - "./resources/1_init.sql:/docker-entrypoint-initdb.d/1_init.sql"
+      - "./resources/2_sample_data.sql:/docker-entrypoint-initdb.d/2_sample_data.sql"

@@ -11,6 +11,21 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    services:
+      # Label used to access the service container
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        volumes:
+          - "./resources/1_init.sql:/docker-entrypoint-initdb.d/1_init.sql"
+          - "./resources/2_sample_data.sql:/docker-entrypoint-initdb.d/2_sample_data.sql"
+
     steps:
     - uses: actions/checkout@v2
     - name: Cache cargo registry
