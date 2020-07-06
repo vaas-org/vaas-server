@@ -31,7 +31,7 @@ pub struct IncomingLogin {
 #[derive(Serialize, Deserialize)]
 pub struct IncomingVote {
     pub alternative_id: AlternativeId,
-    pub user_id: UserId, // TODO: should be removed
+    pub user_id: Option<UserId>, // Used for fake voting
 }
 #[derive(Serialize, Deserialize)]
 pub struct IncomingReconnect {
@@ -160,7 +160,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                         IncomingMessage::Vote(vote) => {
                             debug!("Incoming vote");
                             let vote_actor = VoteActor::from_registry();
-                            let user_id = vote.user_id; // TODO: Should not be sent by client
+                            let user_id = if let Some(user_id) = self.user_id.clone() {
+                                user_id
+                            } else if let Some(user_id) = vote.user_id {
+                                // Fake user vote from frontend
+                                user_id
+                            } else {
+                                error!("Tried to vote before logging in");
+                                return;
+                            };
                             let alternative_id = vote.alternative_id;
                             vote_actor.do_send(IncomingVoteMessage(user_id, alternative_id));
                         }
