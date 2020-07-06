@@ -159,7 +159,7 @@ async fn handle_login(login: IncomingLogin) -> Result<(), Report> {
             span.clone(),
         ))
         .await;
-    let user = res.unwrap().unwrap();
+    let user = res??;
     if let Some(user) = user {
         let session_id = SessionId::new();
         let session_actor = SessionActor::from_registry();
@@ -170,7 +170,7 @@ async fn handle_login(login: IncomingLogin) -> Result<(), Report> {
             }),
             span,
         ));
-        let res = with_ctx(|act: &mut WsClient, ctx| {
+        with_ctx(|act: &mut WsClient, ctx| {
             act.session_id = Some(session_id.clone());
             act.user_id = Some(user.uuid);
             act.send_json(
@@ -180,10 +180,8 @@ async fn handle_login(login: IncomingLogin) -> Result<(), Report> {
                     username: Some(user.username),
                 }),
             )
-        });
-        if let Err(err) = res {
-            report_error(err);
-        }
+        })
+        .wrap_err("Failed to send client message on login")?;
     }
     Ok(())
 }
@@ -202,7 +200,7 @@ async fn handle_reconnect(
             span.clone(),
         ))
         .await;
-    let session: Option<InternalSession> = res.unwrap().unwrap();
+    let session: Option<InternalSession> = res??;
     if let Some(session) = session {
         info!("Found session");
         with_ctx(|act: &mut WsClient, _| {
@@ -213,9 +211,9 @@ async fn handle_reconnect(
         let user = db_executor
             .send(SpanMessage::new(UserById(session.user_id), span.clone()))
             .await;
-        if let Some(user) = user.unwrap().unwrap() {
+        if let Some(user) = user?? {
             info!("Found user, sending client info");
-            let res = with_ctx(|act: &mut WsClient, ctx| {
+            with_ctx(|act: &mut WsClient, ctx| {
                 act.send_json(
                     ctx,
                     &OutgoingMessage::Client(OutgoingClient {
@@ -223,10 +221,8 @@ async fn handle_reconnect(
                         username: Some(user.username),
                     }),
                 )
-            });
-            if let Err(err) = res {
-                report_error(err);
-            }
+            })
+            .wrap_err("Failed to send client message on reconnect")?;
         } else {
             error!("Unable to find user connected to session");
         }
