@@ -221,6 +221,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                                         .await;
                                     let session: Option<InternalSession> = res.unwrap().unwrap();
                                     if let Some(session) = session {
+                                        info!("Found session");
                                         with_ctx(|act: &mut WsClient, _| {
                                             act.session_id = Some(session.id.clone());
                                             act.user_id = Some(session.user_id.clone());
@@ -233,6 +234,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                                             ))
                                             .await;
                                         if let Some(user) = user.unwrap().unwrap() {
+                                            info!("Found user, sending client info");
                                             with_ctx(|act: &mut WsClient, ctx| {
                                                 act.send_json(
                                                     ctx,
@@ -242,7 +244,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                                                     }),
                                                 )
                                             });
+                                        } else {
+                                            error!("Unable to find user connected to session");
                                         }
+                                    } else {
+                                        warn!("Unable to find session");
                                     }
                                 }
                                 .interop_actor_boxed(self),

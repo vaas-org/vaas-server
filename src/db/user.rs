@@ -15,6 +15,10 @@ impl UserId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
+
+    pub fn as_string(&self) -> String {
+        self.0.to_hyphenated().to_string()
+    }
 }
 
 #[derive(Clone, Debug)]

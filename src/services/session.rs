@@ -6,7 +6,7 @@ use crate::{
 use actix::prelude::*;
 use actix_interop::{with_ctx, FutureInterop};
 use tracing::info;
-use tracing::{debug, Span};
+use tracing::{debug, span, Level, Span};
 
 #[derive(Default)]
 pub struct SessionActor {
@@ -33,8 +33,8 @@ message_handler_with_span! {
         type Result = ResponseActFuture<Self, <SessionById as Message>::Result>;
 
         fn handle(&mut self, msg: SessionById, _ctx: &mut Context<Self>, _span: Span) -> Self::Result {
-            debug!("Handling session by id");
             async {
+                debug!("Handling session by id");
                 let session = with_ctx(|a: &mut SessionActor, _| a.manager.find_by_id(msg.0));
                 Ok(session)
             }.interop_actor_boxed(self)
@@ -50,8 +50,11 @@ message_handler_with_span! {
         type Result = ResponseActFuture<Self, <SaveSession as Message>::Result>;
 
         fn handle(&mut self, msg: SaveSession, _ctx: &mut Context<Self>, _span: Span) -> Self::Result {
-            debug!("Handling session by id");
             async {
+                let user_id = msg.0.user_id.clone();
+                let span = span!(Level::DEBUG, "save session", user_id = user_id.as_string().as_str());
+                let _enter = span.enter();
+                debug!("Saving session");
                 with_ctx(|a: &mut SessionActor, _| a.manager.insert(msg.0));
                 Ok(())
             }.interop_actor_boxed(self)
