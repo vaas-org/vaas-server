@@ -48,7 +48,7 @@ message_handler_with_span! {
                     r#"
                     SELECT id, uuid as "uuid: _", username FROM users WHERE username = $1
                     "#, username
-                ).fetch_optional(&pool).await.unwrap();
+                ).fetch_optional(&pool).await?;
 
 
                 Ok(user)
@@ -75,7 +75,7 @@ message_handler_with_span! {
                     r#"
                     SELECT id, uuid as "uuid: _", username FROM users WHERE uuid = $1
                     "#, uuid
-                ).fetch_optional(&pool).await.unwrap();
+                ).fetch_optional(&pool).await?;
 
                 Ok(user)
             }.interop_actor_boxed(self)

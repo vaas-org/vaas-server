@@ -79,8 +79,7 @@ async fn handle_connect(msg: Connect, span: Span) -> Result<(), Report> {
     info!("Test test");
     let res = IssueService::from_registry()
         .send(SpanMessage::new(issue::ActiveIssue, span))
-        .await
-        .unwrap();
+        .await?;
     match res {
         Ok(Some(issue)) => {
             let _res = msg.addr.send(ActiveIssue(issue)).await;

@@ -43,7 +43,7 @@ message_handler_with_span! {
                     r#"
                     SELECT id as "id: _", title, issue_id as "issue_id: _" FROM alternatives WHERE issue_id = $1
                     "#, uuid
-                ).fetch_all(&pool).await.unwrap();
+                ).fetch_all(&pool).await?;
 
                 Ok(user)
             }.interop_actor_boxed(self)
