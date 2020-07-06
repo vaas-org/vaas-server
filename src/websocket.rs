@@ -15,6 +15,7 @@ use crate::{
 use actix::prelude::*;
 use actix_interop::{with_ctx, FutureInterop};
 use actix_web_actors::ws;
+use color_eyre::eyre::{Report, WrapErr};
 use db::{
     alternative::AlternativeId,
     issue::IssueId,
@@ -113,12 +114,19 @@ impl WsClient {
             user_id: None,
         }
     }
-    fn send_json<T: Serialize>(&self, ctx: &mut ws::WebsocketContext<Self>, value: &T) {
-        match serde_json::to_string(value) {
-            Ok(json) => ctx.text(json),
-            Err(err) => error!("Failed to convert to JSON {error}", error = err.to_string()),
-        }
+    fn send_json<T: Serialize>(
+        &self,
+        ctx: &mut ws::WebsocketContext<Self>,
+        value: &T,
+    ) -> Result<(), Report> {
+        let json = serde_json::to_string(value).wrap_err("Failed to convert to JSON")?;
+        ctx.text(json);
+        Ok(())
     }
+}
+
+fn report_error(report: Report) {
+    error!("Error report: {:?}", report);
 }
 
 impl Actor for WsClient {
@@ -150,9 +158,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
         match msg {
             Ok(message) => match message {
                 ws::Message::Text(text) => {
-                    let m = serde_json::from_str(&text);
+                    let m = serde_json::from_str(&text).wrap_err("JSON decode");
                     if let Err(serde_error) = m {
-                        println!("JSON error {:#?}", serde_error);
+                        report_error(serde_error);
                         return;
                     }
                     let m = m.unwrap();
@@ -200,13 +208,16 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                                         ));
                                         act.session_id = Some(session_id.clone());
                                         act.user_id = Some(user.uuid);
-                                        act.send_json(
+                                        let res = act.send_json(
                                             ctx,
                                             &OutgoingMessage::Client(OutgoingClient {
                                                 id: session_id,
                                                 username: Some(user.username),
                                             }),
                                         );
+                                        if let Err(err) = res {
+                                            report_error(err);
+                                        }
                                     }
                                     fut::ready(())
                                 })
@@ -243,7 +254,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                                             .await;
                                         if let Some(user) = user.unwrap().unwrap() {
                                             info!("Found user, sending client info");
-                                            with_ctx(|act: &mut WsClient, ctx| {
+                                            let res = with_ctx(|act: &mut WsClient, ctx| {
                                                 act.send_json(
                                                     ctx,
                                                     &OutgoingMessage::Client(OutgoingClient {
@@ -252,6 +263,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                                                     }),
                                                 )
                                             });
+                                            if let Err(err) = res {
+                                                report_error(err);
+                                            }
                                         } else {
                                             error!("Unable to find user connected to session");
                                         }
@@ -285,7 +299,7 @@ impl Handler<services::ActiveIssue> for WsClient {
     fn handle(&mut self, msg: services::ActiveIssue, ctx: &mut Self::Context) {
         debug!("Handling ActiveIssue event");
         let issue = msg.0;
-        self.send_json(
+        let res = self.send_json(
             ctx,
             &OutgoingMessage::Issue(Issue {
                 id: issue.id,
@@ -316,7 +330,10 @@ impl Handler<services::ActiveIssue> for WsClient {
                 max_voters: issue.max_voters,
                 show_distribution: issue.show_distribution,
             }),
-        )
+        );
+        if let Err(err) = res {
+            report_error(err);
+        }
     }
 }
 
@@ -325,13 +342,16 @@ impl Handler<BroadcastVote> for WsClient {
 
     fn handle(&mut self, msg: BroadcastVote, ctx: &mut Self::Context) {
         let vote = msg.0;
-        self.send_json(
+        let res = self.send_json(
             ctx,
             &OutgoingMessage::Vote(OutgoingVote {
                 id: vote.id,
                 alternative_id: vote.alternative_id,
                 user_id: vote.user_id,
             }),
-        )
+        );
+        if let Err(err) = res {
+            report_error(err);
+        }
     }
 }
