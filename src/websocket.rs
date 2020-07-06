@@ -35,6 +35,10 @@ pub struct IncomingVote {
     pub user_id: Option<UserId>, // Used for fake voting
 }
 #[derive(Serialize, Deserialize)]
+pub struct IncomingCreateIssue {
+    pub issue: Issue,
+}
+#[derive(Serialize, Deserialize)]
 pub struct IncomingReconnect {
     pub session_id: SessionId,
 }
@@ -48,6 +52,8 @@ pub enum IncomingMessage {
     Login(IncomingLogin),
     #[serde(rename = "reconnect")]
     Reconnect(IncomingReconnect),
+    #[serde(rename = "issue_create")]
+    CreateIssue(IncomingCreateIssue),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -232,12 +238,23 @@ async fn handle_reconnect(
     Ok(())
 }
 
+async fn handle_create_issue(
+    IncomingCreateIssue { issue }: IncomingCreateIssue,
+) -> Result<(), Report> {
+    let span = span!(Level::DEBUG, "issue_create", issue = issue.title.as_str());
+    let outer_span = span.clone();
+    let _enter = outer_span.enter();
+    debug!("Incoming CreateIssue");
+    Ok(())
+}
+
 async fn handle_ws_message(text: String) -> Result<(), Report> {
     let m = serde_json::from_str(&text).wrap_err("JSON decode")?;
     match m {
         IncomingMessage::Vote(vote) => handle_vote(vote).await,
         IncomingMessage::Login(login) => handle_login(login).await,
         IncomingMessage::Reconnect(reconnect) => handle_reconnect(reconnect).await,
+        IncomingMessage::CreateIssue(issue) => handle_create_issue(issue).await,
     }
 }
 
