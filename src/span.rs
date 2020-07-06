@@ -79,7 +79,7 @@ macro_rules! span_message_impl {
             ) -> Self::Result {
                 let crate::span::SpanMessage { span, msg } = msg;
                 let _enter = span.enter();
-                debug!("Running wrapped span message handler");
+                tracing::debug!("Running wrapped span message handler");
                 Box::new(crate::span::ActorFutureSpanWrap::new(
                     <Self as SpanHandler<$message_type>>::handle(self, msg, ctx, span.clone()),
                     span.clone(),

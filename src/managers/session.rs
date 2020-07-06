@@ -11,7 +11,7 @@ impl SessionId {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InternalSession {
     pub id: SessionId,
     pub user_id: UserId,

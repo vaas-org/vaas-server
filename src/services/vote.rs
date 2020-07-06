@@ -1,10 +1,8 @@
 use super::broadcast::BroadcastActor;
-use crate::{
-    db::user::UserId,
-    managers::{
-        alternative::AlternativeId,
-        vote::{InternalVote, VoteId},
-    },
+use crate::db::{
+    alternative::AlternativeId,
+    user::UserId,
+    vote::{InternalVote, VoteId},
 };
 use actix::prelude::*;
 use std::collections::HashMap;
