@@ -151,7 +151,7 @@ async fn test_vote() {
 
     // Send vote
     let message = IncomingMessage::Vote(IncomingVote {
-        user_id: user_id.clone(),
+        user_id: Some(user_id.clone()),
         alternative_id: alternative_id.clone(),
     });
     let message = serde_json::to_string(&message).unwrap();
