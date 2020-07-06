@@ -123,18 +123,20 @@ impl WsClient {
         ctx.text(json);
         Ok(())
     }
+}
 
-    fn handle_ws_message(
-        &self,
-        ctx: &mut ws::WebsocketContext<Self>,
-        text: String,
-    ) -> Result<(), Report> {
-        let m = serde_json::from_str(&text).wrap_err("JSON decode")?;
-        match m {
-            IncomingMessage::Vote(vote) => {
-                debug!("Incoming vote");
-                let vote_actor = VoteActor::from_registry();
-                let user_id = if let Some(user_id) = self.user_id.clone() {
+fn report_error(report: Report) {
+    error!("Error report: {:?}", report);
+}
+
+async fn handle_ws_message(text: String) -> Result<(), Report> {
+    let m = serde_json::from_str(&text).wrap_err("JSON decode")?;
+    match m {
+        IncomingMessage::Vote(vote) => {
+            debug!("Incoming vote");
+            let vote_actor = VoteActor::from_registry();
+            let user_id =
+                if let Some(user_id) = with_ctx(|act: &mut WsClient, _| act.user_id.clone()) {
                     user_id
                 } else if let Some(user_id) = vote.user_id {
                     // Fake user vote from frontend
@@ -142,108 +144,96 @@ impl WsClient {
                 } else {
                     return Err(eyre!("Tried to vote before logging in"));
                 };
-                let alternative_id = vote.alternative_id;
-                vote_actor.do_send(IncomingVoteMessage(user_id, alternative_id));
+            let alternative_id = vote.alternative_id;
+            vote_actor.do_send(IncomingVoteMessage(user_id, alternative_id));
+        }
+        IncomingMessage::Login(login) => {
+            let span = span!(Level::INFO, "login");
+            let outer_span = span.clone();
+            let _enter = outer_span.enter();
+            debug!("Incoming login {}", login.username);
+            let user_actor = ClientActor::from_registry();
+            let res = user_actor
+                .send(SpanMessage::new(
+                    Login {
+                        username: login.username,
+                    },
+                    span.clone(),
+                ))
+                .await;
+            let user = res.unwrap().unwrap();
+            if let Some(user) = user {
+                let session_id = SessionId::new();
+                let session_actor = SessionActor::from_registry();
+                session_actor.do_send(SpanMessage::new(
+                    SaveSession(InternalSession {
+                        id: session_id.clone(),
+                        user_id: user.uuid.clone(),
+                    }),
+                    span,
+                ));
+                let res = with_ctx(|act: &mut WsClient, ctx| {
+                    act.session_id = Some(session_id.clone());
+                    act.user_id = Some(user.uuid);
+                    act.send_json(
+                        ctx,
+                        &OutgoingMessage::Client(OutgoingClient {
+                            id: session_id,
+                            username: Some(user.username),
+                        }),
+                    )
+                });
+                if let Err(err) = res {
+                    report_error(err);
+                }
             }
-            IncomingMessage::Login(login) => {
-                let span = span!(Level::INFO, "login");
-                let outer_span = span.clone();
-                let _enter = outer_span.enter();
-                debug!("Incoming login {}", login.username);
-                let user_actor = ClientActor::from_registry();
-                user_actor
-                    .send(SpanMessage::new(
-                        Login {
-                            username: login.username,
-                        },
-                        span.clone(),
-                    ))
-                    .into_actor(self)
-                    .then(move |res, act: &mut WsClient, ctx| {
-                        let user = res.unwrap().unwrap();
-                        if let Some(user) = user {
-                            let session_id = SessionId::new();
-                            let session_actor = SessionActor::from_registry();
-                            session_actor.do_send(SpanMessage::new(
-                                SaveSession(InternalSession {
-                                    id: session_id.clone(),
-                                    user_id: user.uuid.clone(),
-                                }),
-                                span,
-                            ));
-                            act.session_id = Some(session_id.clone());
-                            act.user_id = Some(user.uuid);
-                            let res = act.send_json(
-                                ctx,
-                                &OutgoingMessage::Client(OutgoingClient {
-                                    id: session_id,
-                                    username: Some(user.username),
-                                }),
-                            );
-                            if let Err(err) = res {
-                                report_error(err);
-                            }
-                        }
-                        fut::ready(())
-                    })
-                    .spawn(ctx);
-            }
-            IncomingMessage::Reconnect(IncomingReconnect { session_id }) => {
-                let span = span!(Level::INFO, "reconnect", session_id = session_id.0.as_str());
-                let outer_span = span.clone();
-                let _enter = outer_span.enter();
-                debug!("Incoming reconnect");
-                ctx.spawn(
-                    async move {
-                        let session_actor = SessionActor::from_registry();
-                        let res = session_actor
-                            .send(SpanMessage::new(
-                                SessionById(session_id.clone()),
-                                span.clone(),
-                            ))
-                            .await;
-                        let session: Option<InternalSession> = res.unwrap().unwrap();
-                        if let Some(session) = session {
-                            info!("Found session");
-                            with_ctx(|act: &mut WsClient, _| {
-                                act.session_id = Some(session.id.clone());
-                                act.user_id = Some(session.user_id.clone());
-                            });
-                            let db_executor = DbExecutor::from_registry();
-                            let user = db_executor
-                                .send(SpanMessage::new(UserById(session.user_id), span.clone()))
-                                .await;
-                            if let Some(user) = user.unwrap().unwrap() {
-                                info!("Found user, sending client info");
-                                let res = with_ctx(|act: &mut WsClient, ctx| {
-                                    act.send_json(
-                                        ctx,
-                                        &OutgoingMessage::Client(OutgoingClient {
-                                            id: session_id,
-                                            username: Some(user.username),
-                                        }),
-                                    )
-                                });
-                                if let Err(err) = res {
-                                    report_error(err);
-                                }
-                            } else {
-                                error!("Unable to find user connected to session");
-                            }
-                        } else {
-                            warn!("Unable to find session");
-                        }
+        }
+        IncomingMessage::Reconnect(IncomingReconnect { session_id }) => {
+            let span = span!(Level::INFO, "reconnect", session_id = session_id.0.as_str());
+            let outer_span = span.clone();
+            let _enter = outer_span.enter();
+            debug!("Incoming reconnect");
+            let session_actor = SessionActor::from_registry();
+            let res = session_actor
+                .send(SpanMessage::new(
+                    SessionById(session_id.clone()),
+                    span.clone(),
+                ))
+                .await;
+            let session: Option<InternalSession> = res.unwrap().unwrap();
+            if let Some(session) = session {
+                info!("Found session");
+                with_ctx(|act: &mut WsClient, _| {
+                    act.session_id = Some(session.id.clone());
+                    act.user_id = Some(session.user_id.clone());
+                });
+                let db_executor = DbExecutor::from_registry();
+                let user = db_executor
+                    .send(SpanMessage::new(UserById(session.user_id), span.clone()))
+                    .await;
+                if let Some(user) = user.unwrap().unwrap() {
+                    info!("Found user, sending client info");
+                    let res = with_ctx(|act: &mut WsClient, ctx| {
+                        act.send_json(
+                            ctx,
+                            &OutgoingMessage::Client(OutgoingClient {
+                                id: session_id,
+                                username: Some(user.username),
+                            }),
+                        )
+                    });
+                    if let Err(err) = res {
+                        report_error(err);
                     }
-                    .interop_actor_boxed(self),
-                );
+                } else {
+                    error!("Unable to find user connected to session");
+                }
+            } else {
+                warn!("Unable to find session");
             }
-        };
-        Ok(())
-    }
-}
-
-fn report_error(report: Report) {
-    error!("Error report: {:?}", report);
+        }
+    };
+    Ok(())
 }
 
 impl Actor for WsClient {
@@ -275,9 +265,14 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
         match msg {
             Ok(message) => match message {
                 ws::Message::Text(text) => {
-                    if let Err(err) = self.handle_ws_message(ctx, text) {
-                        report_error(err);
-                    }
+                    ctx.spawn(
+                        async move {
+                            if let Err(err) = handle_ws_message(text).await {
+                                report_error(err);
+                            }
+                        }
+                        .interop_actor_boxed(self),
+                    );
                 }
                 ws::Message::Close(reason) => {
                     debug!("Got close message from WS. Reason: {:#?}", reason);
