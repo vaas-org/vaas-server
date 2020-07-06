@@ -129,111 +129,120 @@ fn report_error(report: Report) {
     error!("Error report: {:?}", report);
 }
 
+async fn handle_vote(vote: IncomingVote) -> Result<(), Report> {
+    debug!("Incoming vote");
+    let vote_actor = VoteActor::from_registry();
+    let user_id = if let Some(user_id) = with_ctx(|act: &mut WsClient, _| act.user_id.clone()) {
+        user_id
+    } else if let Some(user_id) = vote.user_id {
+        // Fake user vote from frontend
+        user_id
+    } else {
+        return Err(eyre!("Tried to vote before logging in"));
+    };
+    let alternative_id = vote.alternative_id;
+    vote_actor.do_send(IncomingVoteMessage(user_id, alternative_id));
+    Ok(())
+}
+
+async fn handle_login(login: IncomingLogin) -> Result<(), Report> {
+    let span = span!(Level::INFO, "login");
+    let outer_span = span.clone();
+    let _enter = outer_span.enter();
+    debug!("Incoming login {}", login.username);
+    let user_actor = ClientActor::from_registry();
+    let res = user_actor
+        .send(SpanMessage::new(
+            Login {
+                username: login.username,
+            },
+            span.clone(),
+        ))
+        .await;
+    let user = res.unwrap().unwrap();
+    if let Some(user) = user {
+        let session_id = SessionId::new();
+        let session_actor = SessionActor::from_registry();
+        session_actor.do_send(SpanMessage::new(
+            SaveSession(InternalSession {
+                id: session_id.clone(),
+                user_id: user.uuid.clone(),
+            }),
+            span,
+        ));
+        let res = with_ctx(|act: &mut WsClient, ctx| {
+            act.session_id = Some(session_id.clone());
+            act.user_id = Some(user.uuid);
+            act.send_json(
+                ctx,
+                &OutgoingMessage::Client(OutgoingClient {
+                    id: session_id,
+                    username: Some(user.username),
+                }),
+            )
+        });
+        if let Err(err) = res {
+            report_error(err);
+        }
+    }
+    Ok(())
+}
+
+async fn handle_reconnect(
+    IncomingReconnect { session_id }: IncomingReconnect,
+) -> Result<(), Report> {
+    let span = span!(Level::INFO, "reconnect", session_id = session_id.0.as_str());
+    let outer_span = span.clone();
+    let _enter = outer_span.enter();
+    debug!("Incoming reconnect");
+    let session_actor = SessionActor::from_registry();
+    let res = session_actor
+        .send(SpanMessage::new(
+            SessionById(session_id.clone()),
+            span.clone(),
+        ))
+        .await;
+    let session: Option<InternalSession> = res.unwrap().unwrap();
+    if let Some(session) = session {
+        info!("Found session");
+        with_ctx(|act: &mut WsClient, _| {
+            act.session_id = Some(session.id.clone());
+            act.user_id = Some(session.user_id.clone());
+        });
+        let db_executor = DbExecutor::from_registry();
+        let user = db_executor
+            .send(SpanMessage::new(UserById(session.user_id), span.clone()))
+            .await;
+        if let Some(user) = user.unwrap().unwrap() {
+            info!("Found user, sending client info");
+            let res = with_ctx(|act: &mut WsClient, ctx| {
+                act.send_json(
+                    ctx,
+                    &OutgoingMessage::Client(OutgoingClient {
+                        id: session_id,
+                        username: Some(user.username),
+                    }),
+                )
+            });
+            if let Err(err) = res {
+                report_error(err);
+            }
+        } else {
+            error!("Unable to find user connected to session");
+        }
+    } else {
+        warn!("Unable to find session");
+    }
+    Ok(())
+}
+
 async fn handle_ws_message(text: String) -> Result<(), Report> {
     let m = serde_json::from_str(&text).wrap_err("JSON decode")?;
     match m {
-        IncomingMessage::Vote(vote) => {
-            debug!("Incoming vote");
-            let vote_actor = VoteActor::from_registry();
-            let user_id =
-                if let Some(user_id) = with_ctx(|act: &mut WsClient, _| act.user_id.clone()) {
-                    user_id
-                } else if let Some(user_id) = vote.user_id {
-                    // Fake user vote from frontend
-                    user_id
-                } else {
-                    return Err(eyre!("Tried to vote before logging in"));
-                };
-            let alternative_id = vote.alternative_id;
-            vote_actor.do_send(IncomingVoteMessage(user_id, alternative_id));
-        }
-        IncomingMessage::Login(login) => {
-            let span = span!(Level::INFO, "login");
-            let outer_span = span.clone();
-            let _enter = outer_span.enter();
-            debug!("Incoming login {}", login.username);
-            let user_actor = ClientActor::from_registry();
-            let res = user_actor
-                .send(SpanMessage::new(
-                    Login {
-                        username: login.username,
-                    },
-                    span.clone(),
-                ))
-                .await;
-            let user = res.unwrap().unwrap();
-            if let Some(user) = user {
-                let session_id = SessionId::new();
-                let session_actor = SessionActor::from_registry();
-                session_actor.do_send(SpanMessage::new(
-                    SaveSession(InternalSession {
-                        id: session_id.clone(),
-                        user_id: user.uuid.clone(),
-                    }),
-                    span,
-                ));
-                let res = with_ctx(|act: &mut WsClient, ctx| {
-                    act.session_id = Some(session_id.clone());
-                    act.user_id = Some(user.uuid);
-                    act.send_json(
-                        ctx,
-                        &OutgoingMessage::Client(OutgoingClient {
-                            id: session_id,
-                            username: Some(user.username),
-                        }),
-                    )
-                });
-                if let Err(err) = res {
-                    report_error(err);
-                }
-            }
-        }
-        IncomingMessage::Reconnect(IncomingReconnect { session_id }) => {
-            let span = span!(Level::INFO, "reconnect", session_id = session_id.0.as_str());
-            let outer_span = span.clone();
-            let _enter = outer_span.enter();
-            debug!("Incoming reconnect");
-            let session_actor = SessionActor::from_registry();
-            let res = session_actor
-                .send(SpanMessage::new(
-                    SessionById(session_id.clone()),
-                    span.clone(),
-                ))
-                .await;
-            let session: Option<InternalSession> = res.unwrap().unwrap();
-            if let Some(session) = session {
-                info!("Found session");
-                with_ctx(|act: &mut WsClient, _| {
-                    act.session_id = Some(session.id.clone());
-                    act.user_id = Some(session.user_id.clone());
-                });
-                let db_executor = DbExecutor::from_registry();
-                let user = db_executor
-                    .send(SpanMessage::new(UserById(session.user_id), span.clone()))
-                    .await;
-                if let Some(user) = user.unwrap().unwrap() {
-                    info!("Found user, sending client info");
-                    let res = with_ctx(|act: &mut WsClient, ctx| {
-                        act.send_json(
-                            ctx,
-                            &OutgoingMessage::Client(OutgoingClient {
-                                id: session_id,
-                                username: Some(user.username),
-                            }),
-                        )
-                    });
-                    if let Err(err) = res {
-                        report_error(err);
-                    }
-                } else {
-                    error!("Unable to find user connected to session");
-                }
-            } else {
-                warn!("Unable to find session");
-            }
-        }
-    };
-    Ok(())
+        IncomingMessage::Vote(vote) => handle_vote(vote).await,
+        IncomingMessage::Login(login) => handle_login(login).await,
+        IncomingMessage::Reconnect(reconnect) => handle_reconnect(reconnect).await,
+    }
 }
 
 impl Actor for WsClient {
