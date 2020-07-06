@@ -3,6 +3,7 @@ use crate::span::{SpanHandler, SpanMessage};
 use crate::websocket::WsClient;
 use actix::prelude::*;
 use actix_interop::FutureInterop;
+use color_eyre::eyre::Report;
 use issue::IssueService;
 use std::fmt;
 use tracing::{debug, error, info, instrument, Span};
@@ -18,7 +19,7 @@ pub mod vote;
 pub struct ActiveIssue(pub issue::InternalIssue);
 
 #[derive(Message, Clone)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), Report>")]
 pub struct Connect {
     pub addr: Addr<WsClient>,
 }
@@ -30,7 +31,7 @@ impl fmt::Debug for Connect {
 }
 
 #[derive(Message, Clone)]
-#[rtype(result = "Result<Option<crate::db::user::InternalUser>, &'static str>")]
+#[rtype(result = "Result<Option<crate::db::user::InternalUser>, Report>")]
 pub struct Login {
     pub username: String,
 }
@@ -74,7 +75,7 @@ impl Actor for Service {
 }
 
 #[instrument]
-async fn handle_connect(msg: Connect, span: Span) -> Result<(), ()> {
+async fn handle_connect(msg: Connect, span: Span) -> Result<(), Report> {
     info!("Test test");
     let res = IssueService::from_registry()
         .send(SpanMessage::new(issue::ActiveIssue, span))

@@ -8,6 +8,7 @@ use crate::{
 };
 use actix::prelude::*;
 use actix_interop::FutureInterop;
+use color_eyre::eyre::Report;
 use db::issue::IssueId;
 use tracing::{debug, info, Span};
 
@@ -60,7 +61,7 @@ impl Actor for IssueService {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<Option<InternalIssue>, &'static str>")]
+#[rtype(result = "Result<Option<InternalIssue>, Report>")]
 pub struct ActiveIssue;
 
 message_handler_with_span! {

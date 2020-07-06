@@ -10,9 +10,10 @@ use crate::{
 };
 use actix::prelude::*;
 use actix_interop::FutureInterop;
+use color_eyre::eyre::WrapErr;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use tracing::{debug, error, info, Span};
+use tracing::{debug, info, Span};
 
 // Types
 
@@ -50,14 +51,10 @@ message_handler_with_span! {
         fn handle(&mut self, msg: Login, _ctx: &mut Context<Self>, span: Span) -> Self::Result {
             debug!("Incoming login in ClientActor");
             async {
-                let user = DbExecutor::from_registry().send(SpanMessage::new(UserByUsername(msg.username), span)).await;
-                match user {
-                    Ok(user) => user,
-                    Err(_err) => {
-                        error!("Failed to send message");
-                        Err("To do better error handling")
-                    }
-                }
+                DbExecutor::from_registry()
+                    .send(SpanMessage::new(UserByUsername(msg.username), span))
+                    .await
+                    .wrap_err("Failed to get user by username")?
             }.interop_actor_boxed(self)
         }
     }

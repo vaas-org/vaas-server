@@ -3,6 +3,7 @@ use crate::message_handler_with_span;
 use crate::span::SpanHandler;
 use actix::prelude::*;
 use actix_interop::{with_ctx, FutureInterop};
+use color_eyre::eyre::Report;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 use tracing::{debug, Span};
@@ -36,7 +37,7 @@ pub struct InternalIssue {
 }
 
 #[derive(Message, Clone)]
-#[rtype(result = "Result<Option<InternalIssue>, &'static str>")]
+#[rtype(result = "Result<Option<InternalIssue>, Report>")]
 pub struct IssueById(IssueId);
 
 message_handler_with_span! {
@@ -62,7 +63,7 @@ message_handler_with_span! {
 }
 
 #[derive(Message, Clone)]
-#[rtype(result = "Result<Option<InternalIssue>, &'static str>")]
+#[rtype(result = "Result<Option<InternalIssue>, Report>")]
 pub struct ActiveIssue();
 
 message_handler_with_span! {

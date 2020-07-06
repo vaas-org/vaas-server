@@ -3,6 +3,7 @@ use crate::message_handler_with_span;
 use crate::span::SpanHandler;
 use actix::prelude::*;
 use actix_interop::{with_ctx, FutureInterop};
+use color_eyre::eyre::Report;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 use tracing::{debug, Span};
@@ -25,7 +26,7 @@ pub struct InternalAlternative {
 }
 
 #[derive(Message, Clone)]
-#[rtype(result = "Result<Vec<InternalAlternative>, &'static str>")]
+#[rtype(result = "Result<Vec<InternalAlternative>, Report>")]
 pub struct AlternativesForIssueId(pub IssueId);
 
 message_handler_with_span! {
