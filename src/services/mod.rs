@@ -3,7 +3,7 @@ use crate::span::{SpanHandler, SpanMessage};
 use crate::websocket::WsClient;
 use actix::prelude::*;
 use actix_interop::FutureInterop;
-use color_eyre::eyre::Report;
+use color_eyre::eyre::{Report, WrapErr};
 use issue::IssueService;
 use std::fmt;
 use tracing::{debug, error, info, instrument, Span};
@@ -79,21 +79,18 @@ async fn handle_connect(msg: Connect, span: Span) -> Result<(), Report> {
     info!("Test test");
     let res = IssueService::from_registry()
         .send(SpanMessage::new(issue::ActiveIssue, span))
-        .await?;
+        .await??;
     match res {
-        Ok(Some(issue)) => {
-            let _res = msg.addr.send(ActiveIssue(issue)).await;
+        Some(issue) => {
+            msg.addr
+                .send(ActiveIssue(issue))
+                .await
+                .wrap_err("Failed to send active issue")?;
             // Send existing vote ?
             // no because we havent logged in yet
         }
-        Ok(None) => {
+        None => {
             error!("No active issue found! Missing sample data?");
-        }
-        Err(err) => {
-            error!(
-                "Got error response. TODO check what this actually means {:#?}",
-                err
-            );
         }
     }
     Ok(())
