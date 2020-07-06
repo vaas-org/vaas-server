@@ -68,7 +68,7 @@ enum IssueState {
 
 #[derive(Serialize, Deserialize)]
 struct Alternative {
-    id: AlternativeId,
+    id: Option<AlternativeId>,
     pub title: String,
 }
 
@@ -87,13 +87,13 @@ pub struct OutgoingClient {
 
 #[derive(Serialize, Deserialize)]
 pub struct Issue {
-    id: IssueId,
+    id: Option<IssueId>,
     pub title: String,
     description: String,
-    state: IssueState,
+    state: Option<IssueState>,
     alternatives: Vec<Alternative>,
-    votes: Vec<OutgoingVote>,
-    max_voters: i32,
+    votes: Option<Vec<OutgoingVote>>,
+    max_voters: Option<i32>,
     show_distribution: bool,
 }
 
@@ -320,32 +320,34 @@ impl Handler<services::ActiveIssue> for WsClient {
         let res = self.send_json(
             ctx,
             &OutgoingMessage::Issue(Issue {
-                id: issue.id,
+                id: Some(issue.id),
                 title: issue.title,
                 description: issue.description,
                 state: match issue.state {
-                    db::issue::InternalIssueState::NotStarted => IssueState::NotStarted,
-                    db::issue::InternalIssueState::InProgress => IssueState::InProgress,
-                    db::issue::InternalIssueState::Finished => IssueState::Finished,
+                    db::issue::InternalIssueState::NotStarted => Some(IssueState::NotStarted),
+                    db::issue::InternalIssueState::InProgress => Some(IssueState::InProgress),
+                    db::issue::InternalIssueState::Finished => Some(IssueState::Finished),
                 },
                 alternatives: issue
                     .alternatives
                     .into_iter()
                     .map(|alt: db::alternative::InternalAlternative| Alternative {
-                        id: alt.id,
+                        id: Some(alt.id),
                         title: alt.title,
                     })
                     .collect(),
-                votes: issue
-                    .votes
-                    .into_iter()
-                    .map(|vote: InternalVote| OutgoingVote {
-                        id: vote.id,
-                        alternative_id: vote.alternative_id,
-                        user_id: vote.user_id,
-                    })
-                    .collect(),
-                max_voters: issue.max_voters,
+                votes: Some(
+                    issue
+                        .votes
+                        .into_iter()
+                        .map(|vote: InternalVote| OutgoingVote {
+                            id: vote.id,
+                            alternative_id: vote.alternative_id,
+                            user_id: vote.user_id,
+                        })
+                        .collect(),
+                ),
+                max_voters: Some(issue.max_voters),
                 show_distribution: issue.show_distribution,
             }),
         );
