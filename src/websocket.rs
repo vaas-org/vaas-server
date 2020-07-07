@@ -3,15 +3,7 @@ use crate::services::broadcast::BroadcastActor;
 use crate::services::client::ClientActor;
 use crate::services::vote::{BroadcastVote, IncomingVoteMessage, VoteActor};
 use crate::services::{Login, Service};
-use crate::{
-    db::DbExecutor,
-    db::{
-        self,
-        user::{UserById, UserId},
-    },
-    managers::session::{InternalSession, SessionId},
-    span::SpanMessage,
-};
+use crate::{db, db::DbExecutor, span::SpanMessage};
 use actix::prelude::*;
 use actix_interop::{with_ctx, FutureInterop};
 use actix_web_actors::ws;
@@ -19,6 +11,8 @@ use color_eyre::eyre::{eyre, Report, WrapErr};
 use db::{
     alternative::AlternativeId,
     issue::IssueId,
+    session::{InternalSession, SessionId},
+    user::{UserById, UserId},
     vote::{InternalVote, VoteId},
 };
 use serde::{Deserialize, Serialize};
@@ -167,22 +161,17 @@ async fn handle_login(login: IncomingLogin) -> Result<(), Report> {
         .await;
     let user = res??;
     if let Some(user) = user {
-        let session_id = SessionId::new();
         let session_actor = SessionActor::from_registry();
-        session_actor.do_send(SpanMessage::new(
-            SaveSession(InternalSession {
-                id: session_id.clone(),
-                user_id: user.uuid.clone(),
-            }),
-            span,
-        ));
+        let session = session_actor
+            .send(SpanMessage::new(SaveSession(user.id.clone()), span))
+            .await??;
         with_ctx(|act: &mut WsClient, ctx| {
-            act.session_id = Some(session_id.clone());
-            act.user_id = Some(user.uuid);
+            act.session_id = Some(session.id.clone());
+            act.user_id = Some(user.id);
             act.send_json(
                 ctx,
                 &OutgoingMessage::Client(OutgoingClient {
-                    id: session_id,
+                    id: session.id,
                     username: Some(user.username),
                 }),
             )
@@ -195,7 +184,11 @@ async fn handle_login(login: IncomingLogin) -> Result<(), Report> {
 async fn handle_reconnect(
     IncomingReconnect { session_id }: IncomingReconnect,
 ) -> Result<(), Report> {
-    let span = span!(Level::INFO, "reconnect", session_id = session_id.0.as_str());
+    let span = span!(
+        Level::INFO,
+        "reconnect",
+        session_id = session_id.as_string().as_str()
+    );
     let outer_span = span.clone();
     let _enter = outer_span.enter();
     debug!("Incoming reconnect");

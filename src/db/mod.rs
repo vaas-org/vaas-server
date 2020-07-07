@@ -1,5 +1,6 @@
 pub mod alternative;
 pub mod issue;
+pub mod session;
 pub mod user;
 pub mod vote;
 

@@ -1,7 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    uuid UUID NOT NULL DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username varchar(40) NOT NULL
 );
 
@@ -18,4 +17,9 @@ CREATE TABLE IF NOT EXISTS alternatives (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     issue_id UUID references issues(id),
     title text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID references users(id)
 );
