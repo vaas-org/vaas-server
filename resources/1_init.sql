@@ -23,3 +23,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID references users(id)
 );
+
+CREATE TABLE IF NOT EXISTS votes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID references users(id) NOT NULL,
+    alternative_id UUID references alternatives(id) NOT NULL
+);

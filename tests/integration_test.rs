@@ -3,7 +3,6 @@ use actix_codec::Framed;
 use actix_http::ws::Codec;
 use actix_web::{test, App};
 use actix_web_actors::ws;
-use db::alternative::AlternativeId;
 use dotenv::dotenv;
 use futures::{SinkExt, StreamExt};
 use insta::assert_ron_snapshot;
@@ -12,13 +11,29 @@ use std::env;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::timeout;
-use vaas_server::{
-    db::{self, user::UserId},
-    server, websocket,
-};
+use vaas_server::{db, server, websocket};
 use websocket::{IncomingLogin, IncomingMessage, IncomingReconnect, IncomingVote, OutgoingMessage};
 
 const READ_TIMEOUT_MS: u64 = 200;
+
+use std::sync::Once;
+
+static INIT: Once = Once::new();
+
+pub fn setup_once() {
+    use tracing::Level;
+    use tracing_error::ErrorLayer;
+    use tracing_subscriber::prelude::*;
+    INIT.call_once(|| {
+        // Global tracing subscriber
+        let subscriber = tracing_subscriber::fmt()
+            .with_max_level(Level::INFO)
+            .finish()
+            .with(ErrorLayer::default());
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+        color_eyre::install().unwrap();
+    });
+}
 
 macro_rules! frame_message_type {
     ($framed:expr, $message_type:path) => {
@@ -62,6 +77,7 @@ async fn pg_pool() -> PgPool {
 
 #[actix_rt::test]
 async fn test_login_user() {
+    setup_once();
     // Setup test serve
     let pool = pg_pool().await;
     let mut srv = test::start(move || {
@@ -86,6 +102,7 @@ async fn test_login_user() {
 
 #[actix_rt::test]
 async fn test_reconnect() {
+    setup_once();
     // Setup test server
     let pool = pg_pool().await;
     let mut srv = test::start(move || {
@@ -134,6 +151,7 @@ async fn test_reconnect() {
 
 #[actix_rt::test]
 async fn test_vote() {
+    setup_once();
     // Setup test server
     let pool = pg_pool().await;
     let mut srv = test::start(move || {
@@ -146,23 +164,26 @@ async fn test_vote() {
     let issue = frame_message_type!(framed, OutgoingMessage::Issue);
     assert_eq!(issue.title, "coronvorus bad??");
 
-    let user_id = UserId::new();
-    let alternative_id = AlternativeId::new();
+    let alternative_id = issue.alternatives[0].id.clone().unwrap();
+
+    // Login
+    let message = IncomingMessage::Login(IncomingLogin {
+        username: "user".to_owned(),
+    });
+    let message = serde_json::to_string(&message).unwrap();
+    framed.send(ws::Message::Text(message)).await.unwrap();
+    frame_message_type!(framed, OutgoingMessage::Client);
 
     // Send vote
     let message = IncomingMessage::Vote(IncomingVote {
-        user_id: Some(user_id.clone()),
+        user_id: None,
         alternative_id: alternative_id.clone(),
     });
     let message = serde_json::to_string(&message).unwrap();
     framed.send(ws::Message::Text(message)).await.unwrap();
 
-    // let client = frame_message_type!(framed, OutgoingMessage::Client);
-    // assert_eq!(client.username, None);
-
     let vote = frame_message_type!(framed, OutgoingMessage::Vote);
     assert_eq!(vote.alternative_id, alternative_id);
-    assert_eq!(vote.user_id, user_id);
 
     // Close connection
     framed
@@ -180,6 +201,7 @@ async fn test_vote() {
 
 #[actix_rt::test]
 async fn test_connect() {
+    setup_once();
     // Setup test server
     let pool = pg_pool().await;
     let mut srv = test::start(move || {
