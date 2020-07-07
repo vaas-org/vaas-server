@@ -38,7 +38,11 @@ async_message_handler_with_span!({
             debug!("Retrieving alternative by id {id}", id = uuid);
             let user = sqlx::query_as!(
                 InternalAlternative,
-                r#"SELECT id as "id: _", title, issue_id as "issue_id: _" FROM alternatives WHERE issue_id = $1"#,
+                r#"
+                SELECT id as "id: _", title, issue_id as "issue_id: _"
+                FROM alternatives
+                WHERE issue_id = $1
+                "#,
                 uuid
             )
             .fetch_all(&pool)

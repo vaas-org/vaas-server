@@ -42,16 +42,18 @@ async_message_handler_with_span!({
             let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
             debug!(vote = ?msg, "Adding vote");
             let AddVote(user_id, alternative_id) = msg;
-            let vote = sqlx::query_as!(InternalVote,
-                        r#"
-                            INSERT INTO votes (alternative_id, user_id) VALUES($1, $2)
-                            RETURNING id as "id: _", alternative_id as "alternative_id: _", user_id as "user_id: _"
-                            "#,
-                        alternative_id.0,
-                        user_id.0,
-                    )
-                    .fetch_one(&pool)
-                    .await.wrap_err("Got error while adding vote to DB")?;
+            let vote = sqlx::query_as!(
+                    InternalVote,
+                    r#"
+                    INSERT INTO votes (alternative_id, user_id) VALUES($1, $2)
+                    RETURNING id as "id: _", alternative_id as "alternative_id: _", user_id as "user_id: _"
+                    "#,
+                    alternative_id.0,
+                    user_id.0,
+                )
+                .fetch_one(&pool)
+                .await
+                .wrap_err("Got error while adding vote to DB")?;
             Ok(vote)
         }
     }

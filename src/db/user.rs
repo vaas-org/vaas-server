@@ -42,9 +42,7 @@ async_message_handler_with_span!({
             let username = msg.0;
             let user = sqlx::query_as!(
                 InternalUser,
-                r#"
-                    SELECT id as "id: _", username FROM users WHERE username = $1
-                    "#,
+                r#"SELECT id as "id: _", username FROM users WHERE username = $1"#,
                 username
             )
             .fetch_optional(&pool)
@@ -68,9 +66,7 @@ async_message_handler_with_span!({
             let uuid = user_id.0;
             let user = sqlx::query_as!(
                 InternalUser,
-                r#"
-                    SELECT id as "id: _", username FROM users WHERE id = $1
-                    "#,
+                r#"SELECT id as "id: _", username FROM users WHERE id = $1"#,
                 uuid
             )
             .fetch_optional(&pool)

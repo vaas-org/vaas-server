@@ -46,9 +46,7 @@ async_message_handler_with_span!({
             let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
             let user = sqlx::query_as!(
                 InternalSession,
-                r#"
-                    SELECT id as "id: _", user_id as "user_id: _" FROM sessions WHERE id = $1
-                    "#,
+                r#"SELECT id as "id: _", user_id as "user_id: _" FROM sessions WHERE id = $1"#,
                 session_id.0
             )
             .fetch_optional(&pool)
@@ -75,9 +73,9 @@ async_message_handler_with_span!({
             let user = sqlx::query_as!(
                 InternalSession,
                 r#"
-                    INSERT INTO sessions (user_id) VALUES($1)
-                    RETURNING id as "id: _", user_id as "user_id: _"
-                    "#,
+                INSERT INTO sessions (user_id) VALUES($1)
+                RETURNING id as "id: _", user_id as "user_id: _"
+                "#,
                 user_id.0
             )
             .fetch_one(&pool)

@@ -49,7 +49,8 @@ async_message_handler_with_span!({
             debug!("Retrieving issue by id {id}", id = uuid);
             let user = sqlx::query_as!(InternalIssue,
                     r#"
-                    SELECT id as "id: _", title, description, state as "state: _", max_voters, show_distribution FROM issues WHERE id = $1
+                    SELECT id as "id: _", title, description, state as "state: _", max_voters, show_distribution
+                    FROM issues WHERE id = $1
                     "#, uuid
                 ).fetch_optional(&pool).await?;
 
@@ -67,12 +68,15 @@ async_message_handler_with_span!({
         async fn handle(_msg: ActiveIssue) -> Result<Option<InternalIssue>, Report> {
             let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
             debug!("Retrieving active issue");
-            let user = sqlx::query_as!(InternalIssue,
+            let user = sqlx::query_as!(
+                    InternalIssue,
                     r#"
-                    SELECT id as "id: _", title, description, state as "state: _", max_voters, show_distribution FROM issues
+                    SELECT id as "id: _", title, description, state as "state: _", max_voters, show_distribution
+                    FROM issues
                     "#
-                ).fetch_optional(&pool).await?;
-
+                )
+                .fetch_optional(&pool)
+                .await?;
             Ok(user)
         }
     }
