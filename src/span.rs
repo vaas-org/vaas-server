@@ -36,12 +36,12 @@ where
 #[macro_export]
 macro_rules! span_message_async_impl {
     ($message_type:ident, $actor:ident) => {
-        impl Handler<crate::span::SpanMessage<$message_type>> for $actor {
-            type Result = ResponseActFuture<Self, <$message_type as Message>::Result>;
+        impl actix::Handler<crate::span::SpanMessage<$message_type>> for $actor {
+            type Result = actix::ResponseActFuture<Self, <$message_type as actix::Message>::Result>;
             fn handle(
                 &mut self,
                 msg: crate::span::SpanMessage<$message_type>,
-                _ctx: &mut Context<Self>,
+                _ctx: &mut actix::Context<Self>,
             ) -> Self::Result {
                 use actix_interop::FutureInterop;
                 use tracing_futures::Instrument;
