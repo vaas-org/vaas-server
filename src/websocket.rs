@@ -131,6 +131,7 @@ fn report_error(report: Report) {
 
 async fn handle_vote(vote: IncomingVote) -> Result<(), Report> {
     let span = span!(Level::INFO, "vote", alternative_id = ?vote.alternative_id);
+    let _enter = span.enter();
     debug!("Incoming vote");
     let vote_actor = VoteActor::from_registry();
     let user_id = if let Some(user_id) = with_ctx(|act: &mut WsClient, _| act.user_id.clone()) {
@@ -235,8 +236,7 @@ async fn handle_create_issue(
     IncomingCreateIssue { issue }: IncomingCreateIssue,
 ) -> Result<(), Report> {
     let span = span!(Level::DEBUG, "issue_create", issue = issue.title.as_str());
-    let outer_span = span.clone();
-    let _enter = outer_span.enter();
+    let _enter = span.enter();
     debug!("Incoming CreateIssue");
     Ok(())
 }

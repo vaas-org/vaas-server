@@ -1,12 +1,12 @@
 use super::{user::UserId, DbExecutor};
-use crate::message_handler_with_span;
-use crate::span::SpanHandler;
+use crate::async_message_handler_with_span;
+use crate::span::AsyncSpanHandler;
 use actix::prelude::*;
-use actix_interop::{with_ctx, FutureInterop};
+use actix_interop::with_ctx;
 use color_eyre::eyre::Report;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
-use tracing::{debug, Span};
+use tracing::debug;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Deserialize, Serialize, sqlx::Type)]
 #[sqlx(transparent)]
@@ -38,37 +38,34 @@ pub struct InternalSession {
 #[rtype(result = "Result<Option<InternalSession>, Report>")]
 pub struct SessionById(pub SessionId);
 
-message_handler_with_span! {
-    impl SpanHandler<SessionById> for DbExecutor {
-        type Result = ResponseActFuture<Self, <SessionById as Message>::Result>;
-
-        fn handle(&mut self, msg: SessionById, _ctx: &mut Context<Self>, _span: Span) -> Self::Result {
-            async {
-                let SessionById(session_id) = msg;
-                debug!(id = session_id.as_string().as_str(), "Get session by id");
-                let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
-                let user = sqlx::query_as!(InternalSession,
-                    r#"
+async_message_handler_with_span!({
+    impl AsyncSpanHandler<SessionById> for DbExecutor {
+        async fn handle(msg: SessionById) -> Result<Option<InternalSession>, Report> {
+            let SessionById(session_id) = msg;
+            debug!(id = session_id.as_string().as_str(), "Get session by id");
+            let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
+            let user = sqlx::query_as!(
+                InternalSession,
+                r#"
                     SELECT id as "id: _", user_id as "user_id: _" FROM sessions WHERE id = $1
-                    "#, session_id.0
-                ).fetch_optional(&pool).await?;
+                    "#,
+                session_id.0
+            )
+            .fetch_optional(&pool)
+            .await?;
 
-                Ok(user)
-            }.interop_actor_boxed(self)
+            Ok(user)
         }
     }
-}
+});
 
 #[derive(Message, Clone)]
 #[rtype(result = "Result<InternalSession, Report>")]
 pub struct SaveSession(pub UserId);
 
-message_handler_with_span! {
-impl SpanHandler<SaveSession> for DbExecutor {
-    type Result = ResponseActFuture<Self, <SaveSession as Message>::Result>;
-
-    fn handle(&mut self, msg: SaveSession, _ctx: &mut Context<Self>, _span: Span) -> Self::Result {
-        async {
+async_message_handler_with_span!({
+    impl AsyncSpanHandler<SaveSession> for DbExecutor {
+        async fn handle(msg: SaveSession) -> Result<InternalSession, Report> {
             let SaveSession(user_id) = msg;
             debug!(
                 user_id = user_id.as_string().as_str(),
@@ -88,7 +85,5 @@ impl SpanHandler<SaveSession> for DbExecutor {
 
             Ok(user)
         }
-        .interop_actor_boxed(self)
     }
-}
-}
+});
