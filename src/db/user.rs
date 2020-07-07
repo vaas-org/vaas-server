@@ -3,6 +3,7 @@ use crate::message_handler_with_span;
 use crate::span::SpanHandler;
 use actix::prelude::*;
 use actix_interop::{with_ctx, FutureInterop};
+use color_eyre::eyre::Report;
 use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 use tracing::{debug, Span};
@@ -31,7 +32,7 @@ pub struct InternalUser {
 // Find user
 
 #[derive(Message, Clone)]
-#[rtype(result = "Result<Option<InternalUser>, &'static str>")]
+#[rtype(result = "Result<Option<InternalUser>, Report>")]
 pub struct UserByUsername(pub String);
 
 message_handler_with_span! {
@@ -47,7 +48,7 @@ message_handler_with_span! {
                     r#"
                     SELECT id, uuid as "uuid: _", username FROM users WHERE username = $1
                     "#, username
-                ).fetch_optional(&pool).await.unwrap();
+                ).fetch_optional(&pool).await?;
 
 
                 Ok(user)
@@ -57,7 +58,7 @@ message_handler_with_span! {
 }
 
 #[derive(Message, Clone)]
-#[rtype(result = "Result<Option<InternalUser>, &'static str>")]
+#[rtype(result = "Result<Option<InternalUser>, Report>")]
 pub struct UserById(pub UserId);
 
 message_handler_with_span! {
@@ -74,7 +75,7 @@ message_handler_with_span! {
                     r#"
                     SELECT id, uuid as "uuid: _", username FROM users WHERE uuid = $1
                     "#, uuid
-                ).fetch_optional(&pool).await.unwrap();
+                ).fetch_optional(&pool).await?;
 
                 Ok(user)
             }.interop_actor_boxed(self)

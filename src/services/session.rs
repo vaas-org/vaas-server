@@ -5,6 +5,7 @@ use crate::{
 };
 use actix::prelude::*;
 use actix_interop::{with_ctx, FutureInterop};
+use color_eyre::eyre::Report;
 use tracing::info;
 use tracing::{debug, span, Level, Span};
 
@@ -25,7 +26,7 @@ impl SystemService for SessionActor {}
 impl Supervised for SessionActor {}
 
 #[derive(Message, Clone)]
-#[rtype(result = "Result<Option<InternalSession>, &'static str>")]
+#[rtype(result = "Result<Option<InternalSession>, Report>")]
 pub struct SessionById(pub SessionId);
 
 message_handler_with_span! {
@@ -42,7 +43,7 @@ message_handler_with_span! {
     }
 }
 #[derive(Message, Clone)]
-#[rtype(result = "Result<(), &'static str>")]
+#[rtype(result = "Result<(), Report>")]
 pub struct SaveSession(pub InternalSession);
 
 message_handler_with_span! {

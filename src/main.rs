@@ -1,7 +1,7 @@
 #![warn(clippy::all)]
 use actix_web::{App, HttpServer};
 use dotenv::dotenv;
-use tracing::{info, Level};
+use tracing::{error, info, Level};
 extern crate vaas_server;
 
 use std::env;
@@ -20,6 +20,10 @@ async fn main() -> std::io::Result<()> {
     tracing_subscriber::fmt()
         .with_max_level(Level::DEBUG)
         .init();
+
+    if let Err(err) = color_eyre::install() {
+        error!("Failed to install eyre {:#?}", err);
+    }
 
     info!("Starting server");
 
