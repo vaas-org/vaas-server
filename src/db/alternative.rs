@@ -28,7 +28,7 @@ pub struct InternalAlternative {
 #[rtype(result = "Result<Vec<InternalAlternative>, Report>")]
 pub struct AlternativesForIssueId(pub IssueId);
 
-async_message_handler_with_span! {
+async_message_handler_with_span!({
     impl AsyncSpanHandler<AlternativesForIssueId> for DbExecutor {
         #[instrument]
         async fn handle(msg: AlternativesForIssueId) -> Result<Vec<InternalAlternative>, Report> {
@@ -36,12 +36,14 @@ async_message_handler_with_span! {
             let alternative_id = msg.0;
             let uuid = alternative_id.0;
             debug!("Retrieving alternative by id {id}", id = uuid);
-            let user = sqlx::query_as!(InternalAlternative,
-                                r#"
-                                SELECT id as "id: _", title, issue_id as "issue_id: _" FROM alternatives WHERE issue_id = $1
-                                "#, uuid
-                            ).fetch_all(&pool).await?;
+            let user = sqlx::query_as!(
+                InternalAlternative,
+                r#"SELECT id as "id: _", title, issue_id as "issue_id: _" FROM alternatives WHERE issue_id = $1"#,
+                uuid
+            )
+            .fetch_all(&pool)
+            .await?;
             Ok(user)
         }
     }
-}
+});

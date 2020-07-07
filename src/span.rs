@@ -136,7 +136,7 @@ macro_rules! span_message_async_impl {
 
 #[macro_export]
 macro_rules ! async_message_handler_with_span {
-    (impl AsyncSpanHandler<$M:ident> for $A:ident $t:tt) => {
+    ({impl AsyncSpanHandler<$M:ident> for $A:ident $t:tt}) => {
         crate::span_message_async_impl!($M, $A);
         #[async_trait::async_trait]
         impl AsyncSpanHandler<$M> for $A
