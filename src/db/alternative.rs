@@ -29,11 +29,16 @@ pub struct InternalAlternative {
 #[rtype(result = "Result<Vec<InternalAlternative>, Report>")]
 pub struct AlternativesForIssueId(pub IssueId);
 
-message_handler_with_span! {
+message_handler_with_span!({
     impl SpanHandler<AlternativesForIssueId> for DbExecutor {
         type Result = ResponseActFuture<Self, <AlternativesForIssueId as Message>::Result>;
 
-        fn handle(&mut self, msg: AlternativesForIssueId, _ctx: &mut Context<Self>, _span: Span) -> Self::Result {
+        fn handle(
+            &mut self,
+            msg: AlternativesForIssueId,
+            _ctx: &mut Context<Self>,
+            _span: Span,
+        ) -> Self::Result {
             async {
                 let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
                 let alternative_id = msg.0;
@@ -49,4 +54,4 @@ message_handler_with_span! {
             }.interop_actor_boxed(self)
         }
     }
-}
+});

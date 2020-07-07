@@ -64,35 +64,40 @@ impl Actor for IssueService {
 #[rtype(result = "Result<Option<InternalIssue>, Report>")]
 pub struct ActiveIssue;
 
-message_handler_with_span! {
-impl SpanHandler<ActiveIssue> for IssueService {
-    type Result = ResponseActFuture<Self, <ActiveIssue as Message>::Result>;
+message_handler_with_span!({
+    impl SpanHandler<ActiveIssue> for IssueService {
+        type Result = ResponseActFuture<Self, <ActiveIssue as Message>::Result>;
 
-    fn handle(&mut self, _msg: ActiveIssue, _ctx: &mut Context<Self>, span: Span) -> Self::Result {
-        async {
-            info!("Sending active issue");
-            let issue: Option<db::issue::InternalIssue> = DbExecutor::from_registry()
-                .send(SpanMessage::new(db::issue::ActiveIssue(), span.clone()))
-                .await??;
-            match issue {
-                Some(issue) => {
-                    debug!("Issue found, retrieving alternatives {:#?}", id = issue.id);
-                    let alternatives: Vec<InternalAlternative> = DbExecutor::from_registry()
-                        .send(SpanMessage::new(
-                            db::alternative::AlternativesForIssueId(issue.id.clone()),
-                            span,
-                        ))
-                        .await??;
-                    debug!("Alternatives found {}", alternatives.len());
-                    Ok(Some(InternalIssue::from_db(issue, alternatives)))
+        fn handle(
+            &mut self,
+            _msg: ActiveIssue,
+            _ctx: &mut Context<Self>,
+            span: Span,
+        ) -> Self::Result {
+            async {
+                info!("Sending active issue");
+                let issue: Option<db::issue::InternalIssue> = DbExecutor::from_registry()
+                    .send(SpanMessage::new(db::issue::ActiveIssue(), span.clone()))
+                    .await??;
+                match issue {
+                    Some(issue) => {
+                        debug!("Issue found, retrieving alternatives {:#?}", id = issue.id);
+                        let alternatives: Vec<InternalAlternative> = DbExecutor::from_registry()
+                            .send(SpanMessage::new(
+                                db::alternative::AlternativesForIssueId(issue.id.clone()),
+                                span,
+                            ))
+                            .await??;
+                        debug!("Alternatives found {}", alternatives.len());
+                        Ok(Some(InternalIssue::from_db(issue, alternatives)))
+                    }
+                    None => Ok(None),
                 }
-                None => Ok(None),
             }
+            .interop_actor_boxed(self)
         }
-        .interop_actor_boxed(self)
     }
-}
-}
+});
 
 impl Supervised for IssueService {}
 impl ArbiterService for IssueService {}

@@ -40,11 +40,16 @@ pub struct InternalIssue {
 #[rtype(result = "Result<Option<InternalIssue>, Report>")]
 pub struct IssueById(IssueId);
 
-message_handler_with_span! {
+message_handler_with_span!({
     impl SpanHandler<IssueById> for DbExecutor {
         type Result = ResponseActFuture<Self, <IssueById as Message>::Result>;
 
-        fn handle(&mut self, msg: IssueById, _ctx: &mut Context<Self>, _span: Span) -> Self::Result {
+        fn handle(
+            &mut self,
+            msg: IssueById,
+            _ctx: &mut Context<Self>,
+            _span: Span,
+        ) -> Self::Result {
             async {
                 let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
                 let issue_id = msg.0;
@@ -60,17 +65,22 @@ message_handler_with_span! {
             }.interop_actor_boxed(self)
         }
     }
-}
+});
 
 #[derive(Message, Clone)]
 #[rtype(result = "Result<Option<InternalIssue>, Report>")]
 pub struct ActiveIssue();
 
-message_handler_with_span! {
+message_handler_with_span!({
     impl SpanHandler<ActiveIssue> for DbExecutor {
         type Result = ResponseActFuture<Self, <ActiveIssue as Message>::Result>;
 
-        fn handle(&mut self, _msg: ActiveIssue, _ctx: &mut Context<Self>, _span: Span) -> Self::Result {
+        fn handle(
+            &mut self,
+            _msg: ActiveIssue,
+            _ctx: &mut Context<Self>,
+            _span: Span,
+        ) -> Self::Result {
             async {
                 let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
                 debug!("Retrieving active issue");
@@ -84,4 +94,4 @@ message_handler_with_span! {
             }.interop_actor_boxed(self)
         }
     }
-}
+});

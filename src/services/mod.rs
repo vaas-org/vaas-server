@@ -96,7 +96,7 @@ async fn handle_connect(msg: Connect, span: Span) -> Result<(), Report> {
     Ok(())
 }
 
-message_handler_with_span! {
+message_handler_with_span!({
     impl SpanHandler<Connect> for Service {
         type Result = ResponseActFuture<Self, <Connect as Message>::Result>;
 
@@ -105,7 +105,7 @@ message_handler_with_span! {
             handle_connect(msg, span).interop_actor_boxed(self)
         }
     }
-}
+});
 
 impl Handler<Disconnect> for Service {
     type Result = ();

@@ -44,7 +44,7 @@ impl Actor for ClientActor {
     }
 }
 
-message_handler_with_span! {
+message_handler_with_span!({
     impl SpanHandler<Login> for ClientActor {
         type Result = ResponseActFuture<Self, <Login as Message>::Result>;
 
@@ -55,10 +55,11 @@ message_handler_with_span! {
                     .send(SpanMessage::new(UserByUsername(msg.username), span))
                     .await
                     .wrap_err("Failed to get user by username")?
-            }.interop_actor_boxed(self)
+            }
+            .interop_actor_boxed(self)
         }
     }
-}
+});
 
 impl SystemService for ClientActor {}
 impl Supervised for ClientActor {}

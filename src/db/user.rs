@@ -35,33 +35,42 @@ pub struct InternalUser {
 #[rtype(result = "Result<Option<InternalUser>, Report>")]
 pub struct UserByUsername(pub String);
 
-message_handler_with_span! {
+message_handler_with_span!({
     impl SpanHandler<UserByUsername> for DbExecutor {
         type Result = ResponseActFuture<Self, <UserByUsername as Message>::Result>;
 
-        fn handle(&mut self, msg: UserByUsername, _ctx: &mut Context<Self>, _span: Span) -> Self::Result {
+        fn handle(
+            &mut self,
+            msg: UserByUsername,
+            _ctx: &mut Context<Self>,
+            _span: Span,
+        ) -> Self::Result {
             debug!("Handling connect");
             async {
                 let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
                 let username = msg.0;
-                let user = sqlx::query_as!(InternalUser,
+                let user = sqlx::query_as!(
+                    InternalUser,
                     r#"
                     SELECT id, uuid as "uuid: _", username FROM users WHERE username = $1
-                    "#, username
-                ).fetch_optional(&pool).await?;
-
+                    "#,
+                    username
+                )
+                .fetch_optional(&pool)
+                .await?;
 
                 Ok(user)
-            }.interop_actor_boxed(self)
+            }
+            .interop_actor_boxed(self)
         }
     }
-}
+});
 
 #[derive(Message, Clone)]
 #[rtype(result = "Result<Option<InternalUser>, Report>")]
 pub struct UserById(pub UserId);
 
-message_handler_with_span! {
+message_handler_with_span!({
     impl SpanHandler<UserById> for DbExecutor {
         type Result = ResponseActFuture<Self, <UserById as Message>::Result>;
 
@@ -71,14 +80,19 @@ message_handler_with_span! {
                 let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
                 let user_id = msg.0;
                 let uuid = user_id.0;
-                let user = sqlx::query_as!(InternalUser,
+                let user = sqlx::query_as!(
+                    InternalUser,
                     r#"
                     SELECT id, uuid as "uuid: _", username FROM users WHERE uuid = $1
-                    "#, uuid
-                ).fetch_optional(&pool).await?;
+                    "#,
+                    uuid
+                )
+                .fetch_optional(&pool)
+                .await?;
 
                 Ok(user)
-            }.interop_actor_boxed(self)
+            }
+            .interop_actor_boxed(self)
         }
     }
-}
+});

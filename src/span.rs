@@ -90,11 +90,11 @@ macro_rules! span_message_impl {
 }
 
 #[macro_export]
-macro_rules ! message_handler_with_span {
-    (impl SpanHandler<$M:ident> for $A:ident $t:tt) => {
+macro_rules ! message_handler_with_span(
+    ({impl SpanHandler<$M:ident> for $A:ident $t:tt}) => {
         crate::span_message_impl!($M, $A);
         impl SpanHandler<$M> for $A
             $t
 
     }
-}
+);
