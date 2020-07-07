@@ -166,13 +166,13 @@ async fn handle_login(login: IncomingLogin) -> Result<(), Report> {
         session_actor.do_send(SpanMessage::new(
             SaveSession(InternalSession {
                 id: session_id.clone(),
-                user_id: user.uuid.clone(),
+                user_id: user.id.clone(),
             }),
             span,
         ));
         with_ctx(|act: &mut WsClient, ctx| {
             act.session_id = Some(session_id.clone());
-            act.user_id = Some(user.uuid);
+            act.user_id = Some(user.id);
             act.send_json(
                 ctx,
                 &OutgoingMessage::Client(OutgoingClient {

@@ -24,8 +24,7 @@ impl UserId {
 
 #[derive(Clone, Debug)]
 pub struct InternalUser {
-    pub id: i32,
-    pub uuid: UserId,
+    pub id: UserId,
     pub username: String,
 }
 
@@ -46,7 +45,7 @@ message_handler_with_span! {
                 let username = msg.0;
                 let user = sqlx::query_as!(InternalUser,
                     r#"
-                    SELECT id, uuid as "uuid: _", username FROM users WHERE username = $1
+                    SELECT id as "id: _", username FROM users WHERE username = $1
                     "#, username
                 ).fetch_optional(&pool).await?;
 
@@ -73,7 +72,7 @@ message_handler_with_span! {
                 let uuid = user_id.0;
                 let user = sqlx::query_as!(InternalUser,
                     r#"
-                    SELECT id, uuid as "uuid: _", username FROM users WHERE uuid = $1
+                    SELECT id as "id: _", username FROM users WHERE id = $1
                     "#, uuid
                 ).fetch_optional(&pool).await?;
 
