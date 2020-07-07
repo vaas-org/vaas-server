@@ -35,6 +35,10 @@ pub struct IncomingVote {
     pub user_id: Option<UserId>, // Used for fake voting
 }
 #[derive(Serialize, Deserialize)]
+pub struct IncomingCreateIssue {
+    pub issue: Issue,
+}
+#[derive(Serialize, Deserialize)]
 pub struct IncomingReconnect {
     pub session_id: SessionId,
 }
@@ -48,6 +52,8 @@ pub enum IncomingMessage {
     Login(IncomingLogin),
     #[serde(rename = "reconnect")]
     Reconnect(IncomingReconnect),
+    #[serde(rename = "issue_create")]
+    CreateIssue(IncomingCreateIssue),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -62,7 +68,7 @@ enum IssueState {
 
 #[derive(Serialize, Deserialize)]
 struct Alternative {
-    id: AlternativeId,
+    id: Option<AlternativeId>,
     pub title: String,
 }
 
@@ -81,13 +87,13 @@ pub struct OutgoingClient {
 
 #[derive(Serialize, Deserialize)]
 pub struct Issue {
-    id: IssueId,
+    id: Option<IssueId>,
     pub title: String,
     description: String,
-    state: IssueState,
+    state: Option<IssueState>,
     alternatives: Vec<Alternative>,
-    votes: Vec<OutgoingVote>,
-    max_voters: i32,
+    votes: Option<Vec<OutgoingVote>>,
+    max_voters: Option<i32>,
     show_distribution: bool,
 }
 
@@ -232,12 +238,23 @@ async fn handle_reconnect(
     Ok(())
 }
 
+async fn handle_create_issue(
+    IncomingCreateIssue { issue }: IncomingCreateIssue,
+) -> Result<(), Report> {
+    let span = span!(Level::DEBUG, "issue_create", issue = issue.title.as_str());
+    let outer_span = span.clone();
+    let _enter = outer_span.enter();
+    debug!("Incoming CreateIssue");
+    Ok(())
+}
+
 async fn handle_ws_message(text: String) -> Result<(), Report> {
     let m = serde_json::from_str(&text).wrap_err("JSON decode")?;
     match m {
         IncomingMessage::Vote(vote) => handle_vote(vote).await,
         IncomingMessage::Login(login) => handle_login(login).await,
         IncomingMessage::Reconnect(reconnect) => handle_reconnect(reconnect).await,
+        IncomingMessage::CreateIssue(issue) => handle_create_issue(issue).await,
     }
 }
 
@@ -303,32 +320,34 @@ impl Handler<services::ActiveIssue> for WsClient {
         let res = self.send_json(
             ctx,
             &OutgoingMessage::Issue(Issue {
-                id: issue.id,
+                id: Some(issue.id),
                 title: issue.title,
                 description: issue.description,
                 state: match issue.state {
-                    db::issue::InternalIssueState::NotStarted => IssueState::NotStarted,
-                    db::issue::InternalIssueState::InProgress => IssueState::InProgress,
-                    db::issue::InternalIssueState::Finished => IssueState::Finished,
+                    db::issue::InternalIssueState::NotStarted => Some(IssueState::NotStarted),
+                    db::issue::InternalIssueState::InProgress => Some(IssueState::InProgress),
+                    db::issue::InternalIssueState::Finished => Some(IssueState::Finished),
                 },
                 alternatives: issue
                     .alternatives
                     .into_iter()
                     .map(|alt: db::alternative::InternalAlternative| Alternative {
-                        id: alt.id,
+                        id: Some(alt.id),
                         title: alt.title,
                     })
                     .collect(),
-                votes: issue
-                    .votes
-                    .into_iter()
-                    .map(|vote: InternalVote| OutgoingVote {
-                        id: vote.id,
-                        alternative_id: vote.alternative_id,
-                        user_id: vote.user_id,
-                    })
-                    .collect(),
-                max_voters: issue.max_voters,
+                votes: Some(
+                    issue
+                        .votes
+                        .into_iter()
+                        .map(|vote: InternalVote| OutgoingVote {
+                            id: vote.id,
+                            alternative_id: vote.alternative_id,
+                            user_id: vote.user_id,
+                        })
+                        .collect(),
+                ),
+                max_voters: Some(issue.max_voters),
                 show_distribution: issue.show_distribution,
             }),
         );

@@ -8,7 +8,7 @@ expression: messages
     id: "[uuid]",
     title: "coronvorus bad??",
     description: "yes or yes",
-    state: inprogress,
+    state: Some(inprogress),
     alternatives: [
       Alternative(
         id: "[uuid]",
@@ -23,8 +23,8 @@ expression: messages
         title: "my name is trump i have control",
       ),
     ],
-    votes: [],
-    max_voters: 10,
+    votes: Some([]),
+    max_voters: Some(10),
     show_distribution: true,
   ),
 ]
