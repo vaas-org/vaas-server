@@ -7,6 +7,7 @@ pub mod vote;
 use actix::prelude::*;
 use sqlx::PgPool;
 
+#[derive(Debug)]
 pub struct DbExecutor(pub PgPool);
 
 impl DbExecutor {

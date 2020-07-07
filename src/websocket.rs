@@ -61,8 +61,8 @@ enum IssueState {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Alternative {
-    id: Option<AlternativeId>,
+pub struct Alternative {
+    pub id: Option<AlternativeId>,
     pub title: String,
 }
 
@@ -85,7 +85,7 @@ pub struct Issue {
     pub title: String,
     description: String,
     state: Option<IssueState>,
-    alternatives: Vec<Alternative>,
+    pub alternatives: Vec<Alternative>,
     votes: Option<Vec<OutgoingVote>>,
     max_voters: Option<i32>,
     show_distribution: bool,
@@ -130,6 +130,7 @@ fn report_error(report: Report) {
 }
 
 async fn handle_vote(vote: IncomingVote) -> Result<(), Report> {
+    let span = span!(Level::INFO, "vote", alternative_id = ?vote.alternative_id);
     debug!("Incoming vote");
     let vote_actor = VoteActor::from_registry();
     let user_id = if let Some(user_id) = with_ctx(|act: &mut WsClient, _| act.user_id.clone()) {
@@ -141,8 +142,13 @@ async fn handle_vote(vote: IncomingVote) -> Result<(), Report> {
         return Err(eyre!("Tried to vote before logging in"));
     };
     let alternative_id = vote.alternative_id;
-    vote_actor.do_send(IncomingVoteMessage(user_id, alternative_id));
-    Ok(())
+    vote_actor
+        .send(SpanMessage::new(
+            IncomingVoteMessage(user_id, alternative_id),
+            span,
+        ))
+        .await
+        .wrap_err("Error handling incoming vote")?
 }
 
 async fn handle_login(login: IncomingLogin) -> Result<(), Report> {

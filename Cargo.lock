@@ -2202,7 +2202,7 @@ dependencies = [
 [[package]]
 name = "sqlx"
 version = "0.4.0-pre"
-source = "git+https://github.com/launchbadge/sqlx#e4005bb53d02ec99a50f040df3f7e73ab66f11c7"
+source = "git+https://github.com/launchbadge/sqlx?branch=master#e3b3806db5fc5054cf8dca1347b2ff705b4c0436"
 dependencies = [
  "sqlx-core",
  "sqlx-macros",
@@ -2211,7 +2211,7 @@ dependencies = [
 [[package]]
 name = "sqlx-core"
 version = "0.4.0-pre"
-source = "git+https://github.com/launchbadge/sqlx#e4005bb53d02ec99a50f040df3f7e73ab66f11c7"
+source = "git+https://github.com/launchbadge/sqlx?branch=master#e3b3806db5fc5054cf8dca1347b2ff705b4c0436"
 dependencies = [
  "atoi",
  "base64 0.12.3",
@@ -2254,26 +2254,27 @@ dependencies = [
 [[package]]
 name = "sqlx-macros"
 version = "0.4.0-pre"
-source = "git+https://github.com/launchbadge/sqlx#e4005bb53d02ec99a50f040df3f7e73ab66f11c7"
+source = "git+https://github.com/launchbadge/sqlx?branch=master#e3b3806db5fc5054cf8dca1347b2ff705b4c0436"
 dependencies = [
  "dotenv",
+ "either",
  "futures",
  "heck",
- "once_cell",
  "proc-macro2",
  "quote",
  "sqlx-core",
+ "sqlx-rt",
  "syn",
- "tokio",
  "url",
 ]
 
 [[package]]
 name = "sqlx-rt"
 version = "0.1.0-pre"
-source = "git+https://github.com/launchbadge/sqlx#e4005bb53d02ec99a50f040df3f7e73ab66f11c7"
+source = "git+https://github.com/launchbadge/sqlx?branch=master#e3b3806db5fc5054cf8dca1347b2ff705b4c0436"
 dependencies = [
  "native-tls",
+ "once_cell",
  "tokio",
  "tokio-native-tls",
 ]
@@ -2710,6 +2711,7 @@ dependencies = [
  "sqlx",
  "tokio",
  "tracing",
+ "tracing-error",
  "tracing-futures",
  "tracing-subscriber",
  "uuid",

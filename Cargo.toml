@@ -27,6 +27,7 @@ pin-project = "0.4.17"
 sqlx = {  git = "https://github.com/launchbadge/sqlx", branch = "master", default-features = false, features = [ "runtime-tokio", "macros", "postgres", "uuid" ] }
 dotenv = "0.15.0"
 color-eyre = "0.5.0"
+tracing-error = "0.1.2"
 
 
 [dev-dependencies]

@@ -2,6 +2,8 @@
 use actix_web::{App, HttpServer};
 use dotenv::dotenv;
 use tracing::{error, info, Level};
+use tracing_error::ErrorLayer;
+use tracing_subscriber::prelude::*;
 extern crate vaas_server;
 
 use std::env;
@@ -17,9 +19,11 @@ async fn main() -> std::io::Result<()> {
     server::register_system_actors();
 
     // Global tracing subscriber
-    tracing_subscriber::fmt()
+    let subscriber = tracing_subscriber::fmt()
         .with_max_level(Level::DEBUG)
-        .init();
+        .finish()
+        .with(ErrorLayer::default());
+    tracing::subscriber::set_global_default(subscriber).unwrap();
 
     if let Err(err) = color_eyre::install() {
         error!("Failed to install eyre {:#?}", err);
