@@ -39,7 +39,7 @@ message_handler_with_span! {
         fn handle(&mut self, msg: SessionById, _ctx: &mut Context<Self>, span: Span) -> Self::Result {
             async {
                 debug!("Handling session by id");
-                DbExecutor::from_registry().send(SpanMessage::new(db::session::SessionById(msg.0), span)).await?
+                DbExecutor::from_registry().send(SpanMessage::new(db::session::SessionById(msg.0))).await?
             }.interop_actor_boxed(self)
         }
     }
@@ -58,7 +58,7 @@ message_handler_with_span! {
                 let span = span!(Level::DEBUG, "save session", user_id = user_id.as_string().as_str());
                 let _enter = span.enter();
                 debug!("Saving session");
-                DbExecutor::from_registry().send(SpanMessage::new(db::session::SaveSession(msg.0), span.clone())).await?
+                DbExecutor::from_registry().send(SpanMessage::new(db::session::SaveSession(msg.0))).await?
             }.interop_actor_boxed(self)
         }
     }

@@ -85,8 +85,7 @@ message_handler_with_span! {
 
                 let vote = DbExecutor::from_registry()
                     .send(SpanMessage::new(
-                        db::vote::AddVote(user_id, alternative_id),
-                        span,
+                        db::vote::AddVote(user_id, alternative_id)
                     ))
                     .await??;
 

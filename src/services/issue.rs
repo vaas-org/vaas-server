@@ -72,15 +72,14 @@ impl SpanHandler<ActiveIssue> for IssueService {
         async {
             info!("Sending active issue");
             let issue: Option<db::issue::InternalIssue> = DbExecutor::from_registry()
-                .send(SpanMessage::new(db::issue::ActiveIssue(), span.clone()))
+                .send(SpanMessage::new(db::issue::ActiveIssue()))
                 .await??;
             match issue {
                 Some(issue) => {
                     debug!("Issue found, retrieving alternatives {:#?}", id = issue.id);
                     let alternatives: Vec<InternalAlternative> = DbExecutor::from_registry()
                         .send(SpanMessage::new(
-                            db::alternative::AlternativesForIssueId(issue.id.clone()),
-                            span,
+                            db::alternative::AlternativesForIssueId(issue.id.clone())
                         ))
                         .await??;
                     debug!("Alternatives found {}", alternatives.len());

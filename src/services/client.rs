@@ -52,7 +52,7 @@ message_handler_with_span! {
             debug!("Incoming login in ClientActor");
             async {
                 DbExecutor::from_registry()
-                    .send(SpanMessage::new(UserByUsername(msg.username), span))
+                    .send(SpanMessage::new(UserByUsername(msg.username)))
                     .await
                     .wrap_err("Failed to get user by username")?
             }.interop_actor_boxed(self)

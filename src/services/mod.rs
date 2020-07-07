@@ -78,7 +78,7 @@ impl Actor for Service {
 async fn handle_connect(msg: Connect, span: Span) -> Result<(), Report> {
     info!("Test test");
     let res = IssueService::from_registry()
-        .send(SpanMessage::new(issue::ActiveIssue, span))
+        .send(SpanMessage::new(issue::ActiveIssue))
         .await??;
     match res {
         Some(issue) => {

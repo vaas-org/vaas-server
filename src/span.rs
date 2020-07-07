@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use pin_project::pin_project;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::{error, Span};
+use tracing::Span;
 
 /// Message with span used for trace logging
 pub struct SpanMessage<I> {
@@ -13,11 +13,7 @@ pub struct SpanMessage<I> {
 }
 
 impl<M> SpanMessage<M> {
-    pub fn new(msg: M, span: Span) -> Self {
-        Self { msg, span }
-    }
-
-    pub fn new_current(msg: M) -> Self {
+    pub fn new(msg: M) -> Self {
         Self {
             msg,
             span: Span::current(),
