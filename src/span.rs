@@ -1,9 +1,10 @@
 use actix::dev::MessageResponse;
 use actix::prelude::*;
+use async_trait::async_trait;
 use pin_project::pin_project;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::Span;
+use tracing::{error, Span};
 
 /// Message with span used for trace logging
 pub struct SpanMessage<I> {
@@ -11,9 +12,16 @@ pub struct SpanMessage<I> {
     pub span: Span,
 }
 
-impl<I> SpanMessage<I> {
-    pub fn new(msg: I, span: Span) -> Self {
+impl<M> SpanMessage<M> {
+    pub fn new(msg: M, span: Span) -> Self {
         Self { msg, span }
+    }
+
+    pub fn new_current(msg: M) -> Self {
+        Self {
+            msg,
+            span: Span::current(),
+        }
     }
 }
 
@@ -34,6 +42,15 @@ where
 
     /// This method is called for every message received by this actor.
     fn handle(&mut self, msg: M, ctx: &mut Self::Context, span: Span) -> Self::Result;
+}
+
+#[async_trait]
+pub trait AsyncSpanHandler<M>
+where
+    Self: Actor,
+    M: Message,
+{
+    async fn handle(msg: M) -> <M as Message>::Result;
 }
 
 /// ActorFuture wrapper that enters span before polling future
@@ -94,6 +111,39 @@ macro_rules ! message_handler_with_span {
     (impl SpanHandler<$M:ident> for $A:ident $t:tt) => {
         crate::span_message_impl!($M, $A);
         impl SpanHandler<$M> for $A
+            $t
+
+    }
+}
+
+#[macro_export]
+macro_rules! span_message_async_impl {
+    ($message_type:ident, $actor:ident) => {
+        use actix_interop::FutureInterop;
+        use tracing_futures::Instrument;
+        impl Handler<crate::span::SpanMessage<$message_type>> for $actor {
+            type Result = ResponseActFuture<Self, <$message_type as Message>::Result>;
+            fn handle(
+                &mut self,
+                msg: crate::span::SpanMessage<$message_type>,
+                _ctx: &mut Context<Self>,
+            ) -> Self::Result {
+                let crate::span::SpanMessage { span, msg } = msg;
+                let _enter = span.enter();
+                <Self as AsyncSpanHandler<$message_type>>::handle(msg)
+                    .in_current_span()
+                    .interop_actor_boxed(self)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules ! async_message_handler_with_span {
+    (impl AsyncSpanHandler<$M:ident> for $A:ident $t:tt) => {
+        crate::span_message_async_impl!($M, $A);
+        #[async_trait::async_trait]
+        impl AsyncSpanHandler<$M> for $A
             $t
 
     }

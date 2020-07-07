@@ -28,6 +28,7 @@ sqlx = {  git = "https://github.com/launchbadge/sqlx", branch = "master", defaul
 dotenv = "0.15.0"
 color-eyre = "0.5.0"
 tracing-error = "0.1.2"
+async-trait = "0.1.36"
 
 
 [dev-dependencies]
