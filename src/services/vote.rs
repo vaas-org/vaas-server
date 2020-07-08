@@ -1,13 +1,12 @@
 use super::broadcast::BroadcastActor;
-use crate::span::{SpanHandler, SpanMessage};
+use crate::span::{AsyncSpanHandler, SpanMessage};
 use crate::{
+    async_message_handler_with_span,
     db::{self, alternative::AlternativeId, user::UserId, vote::InternalVote, DbExecutor},
-    message_handler_with_span,
 };
 use actix::prelude::*;
-use actix_interop::FutureInterop;
 use color_eyre::eyre::Report;
-use tracing::{debug, info, Span};
+use tracing::{debug, info};
 
 // IncomingGetMyVote could have Addr<WsClient> arg
 // so that it can respond to messages.. maybe?
@@ -70,34 +69,22 @@ pub struct MyVote(pub UserId);
 //         return MessageResult(vote);
 //     }
 // }
-message_handler_with_span! {
-    impl SpanHandler<IncomingVoteMessage> for VoteActor {
-        type Result = ResponseActFuture<Self, <IncomingVoteMessage as Message>::Result>;
-        fn handle(
-            &mut self,
-            msg: IncomingVoteMessage,
-            _ctx: &mut Context<Self>,
-            span: Span,
-        ) -> Self::Result {
-            async {
-                debug!("VoteActor handling IncomingVoteMessage");
-                let IncomingVoteMessage(user_id, alternative_id) = msg;
+async_message_handler_with_span!({
+    impl AsyncSpanHandler<IncomingVoteMessage> for VoteActor {
+        async fn handle(msg: IncomingVoteMessage) -> Result<(), Report> {
+            debug!("VoteActor handling IncomingVoteMessage");
+            let IncomingVoteMessage(user_id, alternative_id) = msg;
 
-                let vote = DbExecutor::from_registry()
-                    .send(SpanMessage::new(
-                        db::vote::AddVote(user_id, alternative_id),
-                        span,
-                    ))
-                    .await??;
+            let vote = DbExecutor::from_registry()
+                .send(SpanMessage::new(db::vote::AddVote(user_id, alternative_id)))
+                .await??;
 
-                let broadcast = BroadcastActor::from_registry();
-                broadcast.do_send(BroadcastVote(vote));
-                Ok(())
-            }
-            .interop_actor_boxed(self)
+            let broadcast = BroadcastActor::from_registry();
+            broadcast.do_send(BroadcastVote(vote));
+            Ok(())
         }
     }
-}
+});
 
 impl SystemService for VoteActor {}
 impl Supervised for VoteActor {}

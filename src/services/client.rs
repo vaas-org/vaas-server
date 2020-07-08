@@ -1,19 +1,18 @@
 use super::Login;
-use crate::span::{SpanHandler, SpanMessage};
+use crate::span::{AsyncSpanHandler, SpanMessage};
 use crate::{
+    async_message_handler_with_span,
     db::{
         user::{UserByUsername, UserId},
         DbExecutor,
     },
-    message_handler_with_span,
     websocket::WsClient,
 };
 use actix::prelude::*;
-use actix_interop::FutureInterop;
-use color_eyre::eyre::WrapErr;
+use color_eyre::{eyre::WrapErr, Report};
 use std::collections::HashMap;
 use std::collections::HashSet;
-use tracing::{debug, info, Span};
+use tracing::{debug, info};
 
 // Types
 
@@ -44,21 +43,17 @@ impl Actor for ClientActor {
     }
 }
 
-message_handler_with_span! {
-    impl SpanHandler<Login> for ClientActor {
-        type Result = ResponseActFuture<Self, <Login as Message>::Result>;
-
-        fn handle(&mut self, msg: Login, _ctx: &mut Context<Self>, span: Span) -> Self::Result {
+async_message_handler_with_span!({
+    impl AsyncSpanHandler<Login> for ClientActor {
+        async fn handle(msg: Login) -> Result<Option<crate::db::user::InternalUser>, Report> {
             debug!("Incoming login in ClientActor");
-            async {
-                DbExecutor::from_registry()
-                    .send(SpanMessage::new(UserByUsername(msg.username), span))
-                    .await
-                    .wrap_err("Failed to get user by username")?
-            }.interop_actor_boxed(self)
+            DbExecutor::from_registry()
+                .send(SpanMessage::new(UserByUsername(msg.username)))
+                .await
+                .wrap_err("Failed to get user by username")?
         }
     }
-}
+});
 
 impl SystemService for ClientActor {}
 impl Supervised for ClientActor {}

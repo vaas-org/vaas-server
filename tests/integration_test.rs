@@ -14,7 +14,7 @@ use tokio::time::timeout;
 use vaas_server::{db, server, websocket};
 use websocket::{IncomingLogin, IncomingMessage, IncomingReconnect, IncomingVote, OutgoingMessage};
 
-const READ_TIMEOUT_MS: u64 = 200;
+const READ_TIMEOUT_MS: u64 = 400;
 
 use std::sync::Once;
 
@@ -54,7 +54,7 @@ async fn read_message(
     // ???
     match frame.ok()??.unwrap() {
         ws::Frame::Text(item) => Some(serde_json::from_slice(&item[..]).unwrap()),
-        _ => None,
+        f => panic!("Got unexpected frame {:?}", f),
     }
 }
 

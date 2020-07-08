@@ -131,6 +131,7 @@ fn report_error(report: Report) {
 
 async fn handle_vote(vote: IncomingVote) -> Result<(), Report> {
     let span = span!(Level::INFO, "vote", alternative_id = ?vote.alternative_id);
+    let _enter = span.enter();
     debug!("Incoming vote");
     let vote_actor = VoteActor::from_registry();
     let user_id = if let Some(user_id) = with_ctx(|act: &mut WsClient, _| act.user_id.clone()) {
@@ -143,10 +144,10 @@ async fn handle_vote(vote: IncomingVote) -> Result<(), Report> {
     };
     let alternative_id = vote.alternative_id;
     vote_actor
-        .send(SpanMessage::new(
-            IncomingVoteMessage(user_id, alternative_id),
-            span,
-        ))
+        .send(SpanMessage::new(IncomingVoteMessage(
+            user_id,
+            alternative_id,
+        )))
         .await
         .wrap_err("Error handling incoming vote")?
 }
@@ -158,18 +159,15 @@ async fn handle_login(login: IncomingLogin) -> Result<(), Report> {
     debug!("Incoming login {}", login.username);
     let user_actor = ClientActor::from_registry();
     let res = user_actor
-        .send(SpanMessage::new(
-            Login {
-                username: login.username,
-            },
-            span.clone(),
-        ))
+        .send(SpanMessage::new(Login {
+            username: login.username,
+        }))
         .await;
     let user = res??;
     if let Some(user) = user {
         let session_actor = SessionActor::from_registry();
         let session = session_actor
-            .send(SpanMessage::new(SaveSession(user.id.clone()), span))
+            .send(SpanMessage::new(SaveSession(user.id.clone())))
             .await??;
         with_ctx(|act: &mut WsClient, ctx| {
             act.session_id = Some(session.id.clone());
@@ -200,10 +198,7 @@ async fn handle_reconnect(
     debug!("Incoming reconnect");
     let session_actor = SessionActor::from_registry();
     let res = session_actor
-        .send(SpanMessage::new(
-            SessionById(session_id.clone()),
-            span.clone(),
-        ))
+        .send(SpanMessage::new(SessionById(session_id.clone())))
         .await;
     let session: Option<InternalSession> = res??;
     if let Some(session) = session {
@@ -214,7 +209,7 @@ async fn handle_reconnect(
         });
         let db_executor = DbExecutor::from_registry();
         let user = db_executor
-            .send(SpanMessage::new(UserById(session.user_id), span.clone()))
+            .send(SpanMessage::new(UserById(session.user_id)))
             .await;
         if let Some(user) = user?? {
             info!("Found user, sending client info");
@@ -241,8 +236,7 @@ async fn handle_create_issue(
     IncomingCreateIssue { issue }: IncomingCreateIssue,
 ) -> Result<(), Report> {
     let span = span!(Level::DEBUG, "issue_create", issue = issue.title.as_str());
-    let outer_span = span.clone();
-    let _enter = outer_span.enter();
+    let _enter = span.enter();
     debug!("Incoming CreateIssue");
     Ok(())
 }
@@ -267,7 +261,7 @@ impl Actor for WsClient {
         let addr = ctx.address();
         let connect = services::Connect { addr };
         let service = Service::from_registry();
-        service.do_send(SpanMessage::new(connect.clone(), span.clone()));
+        service.do_send(SpanMessage::new(connect.clone()));
         BroadcastActor::from_registry().do_send(connect);
     }
 

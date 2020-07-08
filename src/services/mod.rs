@@ -1,12 +1,11 @@
-use crate::message_handler_with_span;
-use crate::span::{SpanHandler, SpanMessage};
+use crate::async_message_handler_with_span;
+use crate::span::{AsyncSpanHandler, SpanMessage};
 use crate::websocket::WsClient;
 use actix::prelude::*;
-use actix_interop::FutureInterop;
 use color_eyre::eyre::{Report, WrapErr};
 use issue::IssueService;
 use std::fmt;
-use tracing::{debug, error, info, instrument, Span};
+use tracing::{debug, error, info, instrument};
 
 pub mod broadcast;
 pub mod client;
@@ -75,10 +74,10 @@ impl Actor for Service {
 }
 
 #[instrument]
-async fn handle_connect(msg: Connect, span: Span) -> Result<(), Report> {
+async fn handle_connect(msg: Connect) -> Result<(), Report> {
     info!("Test test");
     let res = IssueService::from_registry()
-        .send(SpanMessage::new(issue::ActiveIssue, span))
+        .send(SpanMessage::new(issue::ActiveIssue))
         .await??;
     match res {
         Some(issue) => {
@@ -96,16 +95,14 @@ async fn handle_connect(msg: Connect, span: Span) -> Result<(), Report> {
     Ok(())
 }
 
-message_handler_with_span! {
-    impl SpanHandler<Connect> for Service {
-        type Result = ResponseActFuture<Self, <Connect as Message>::Result>;
-
-        fn handle(&mut self, msg: Connect, _ctx: &mut Context<Self>, span: Span) -> Self::Result {
+async_message_handler_with_span!({
+    impl AsyncSpanHandler<Connect> for Service {
+        async fn handle(msg: Connect) -> Result<(), Report> {
             debug!("Handling connect");
-            handle_connect(msg, span).interop_actor_boxed(self)
+            handle_connect(msg).await
         }
     }
-}
+});
 
 impl Handler<Disconnect> for Service {
     type Result = ();
