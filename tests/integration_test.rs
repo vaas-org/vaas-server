@@ -54,7 +54,7 @@ async fn read_message(
     // ???
     match frame.ok()??.unwrap() {
         ws::Frame::Text(item) => Some(serde_json::from_slice(&item[..]).unwrap()),
-        _ => None,
+        f => panic!("Got unexpected frame {:?}", f),
     }
 }
 
