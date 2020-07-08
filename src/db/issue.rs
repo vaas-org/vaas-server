@@ -17,6 +17,13 @@ impl IssueId {
         Self(Uuid::new_v4())
     }
 }
+
+impl Default for IssueId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Clone, PartialEq, Debug, sqlx::Type)]
 #[sqlx(rename = "text")]
 #[sqlx(rename_all = "snake_case")]

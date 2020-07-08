@@ -2,30 +2,20 @@ use super::Login;
 use crate::span::{AsyncSpanHandler, SpanMessage};
 use crate::{
     async_message_handler_with_span,
-    db::{
-        user::{UserByUsername, UserId},
-        DbExecutor,
-    },
-    websocket::WsClient,
+    db::{user::UserByUsername, DbExecutor},
 };
 use actix::prelude::*;
 use color_eyre::{eyre::WrapErr, Report};
-use std::collections::HashMap;
-use std::collections::HashSet;
 use tracing::{debug, info};
 
 // Types
 
 // Actor
-pub struct ClientActor {
-    clients: HashMap<UserId, HashSet<Addr<WsClient>>>,
-}
+pub struct ClientActor {}
 
 impl ClientActor {
     pub fn new() -> Self {
-        ClientActor {
-            clients: HashMap::new(),
-        }
+        ClientActor {}
     }
 }
 

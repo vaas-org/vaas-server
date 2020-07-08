@@ -22,6 +22,12 @@ impl UserId {
     }
 }
 
+impl Default for UserId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct InternalUser {
     pub id: UserId,
