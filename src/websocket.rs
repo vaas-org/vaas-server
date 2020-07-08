@@ -125,6 +125,12 @@ impl WsClient {
     }
 }
 
+impl Default for WsClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn report_error(report: Report) {
     error!("Error report: {:?}", report);
 }

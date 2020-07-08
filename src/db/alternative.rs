@@ -17,6 +17,12 @@ impl AlternativeId {
     }
 }
 
+impl Default for AlternativeId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct InternalAlternative {
     pub id: AlternativeId,
