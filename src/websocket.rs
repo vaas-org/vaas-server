@@ -137,7 +137,7 @@ fn report_error(report: Report) {
 }
 
 async fn handle_vote(vote: IncomingVote) -> Result<(), Report> {
-    let span = span!(Level::INFO, "vote", alternative_id = ?vote.alternative_id);
+    let span = span!(Level::DEBUG, "vote", alternative_id = ?vote.alternative_id);
     let _enter = span.enter();
     debug!("Incoming vote");
     let vote_actor = VoteActor::from_registry();

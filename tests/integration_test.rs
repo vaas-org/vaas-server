@@ -21,13 +21,17 @@ const READ_TIMEOUT_MS: u64 = 400;
 static INIT: Once = Once::new();
 
 fn setup_once() {
-    use tracing::Level;
     use tracing_error::ErrorLayer;
     use tracing_subscriber::prelude::*;
+    use tracing_subscriber::{filter::LevelFilter, EnvFilter};
     INIT.call_once(|| {
         // Global tracing subscriber
         let subscriber = tracing_subscriber::fmt()
-            .with_max_level(Level::INFO)
+            .with_env_filter(
+                EnvFilter::from_default_env()
+                    .add_directive("[test_db]=trace".parse().unwrap())
+                    .add_directive(LevelFilter::INFO.into()),
+            )
             .finish()
             .with(ErrorLayer::default());
         tracing::subscriber::set_global_default(subscriber).unwrap();

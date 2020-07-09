@@ -4,7 +4,7 @@ use sqlx::Executor;
 use sqlx::{postgres::PgConnectOptions, PgPool};
 use std::fs;
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{debug, span};
 use vaas_server::db;
 
 lazy_static! {
@@ -13,6 +13,7 @@ lazy_static! {
 
 async fn create_test_db(pool: PgPool, test_db: &str) {
     let _lock = CREATE_DB_MUTEX.lock().await;
+    debug!("Creating new test db");
 
     sqlx::query(&format!("DROP DATABASE IF EXISTS {}", test_db))
         .execute(&pool)
@@ -24,13 +25,13 @@ async fn create_test_db(pool: PgPool, test_db: &str) {
         .unwrap();
 }
 
-async fn init_test_db(pool: &PgPool, test_db: &str) {
+async fn init_test_db(pool: &PgPool) {
     let mut resources: Vec<fs::DirEntry> = fs::read_dir("resources")
         .unwrap()
         .map(|entry| entry.unwrap())
         .collect();
     resources.sort_by_key(|r| r.file_name());
-    info!(name = test_db, "Executing init SQL in test db");
+    debug!("Executing init SQL in test db");
     for resource in resources {
         pool.execute(fs::read_to_string(resource.path()).unwrap().as_str())
             .await
@@ -40,6 +41,7 @@ async fn init_test_db(pool: &PgPool, test_db: &str) {
 
 async fn drop_test_db(pool: PgPool, test_db: &str) {
     let _lock = CREATE_DB_MUTEX.lock().await;
+    debug!("Dropping test db");
     sqlx::query(&format!("DROP DATABASE {}", test_db))
         .execute(&pool)
         .await
@@ -63,6 +65,8 @@ impl IntegrationTestDb {
 
         // Creating test database with random name
         let db_name = format!("integration_{}", uuid::Uuid::new_v4().to_simple());
+        let span = span!(tracing::Level::DEBUG, "test_db", test_db = db_name.as_str());
+        let _enter = span.enter();
         let template_pool = db::new_pool_with(template_connect_options.clone())
             .await
             .unwrap();
@@ -70,7 +74,7 @@ impl IntegrationTestDb {
 
         let integration_pool = template_connect_options.clone().database(&db_name);
         let pool = db::new_pool_with(integration_pool).await.unwrap();
-        init_test_db(&pool, &db_name).await;
+        init_test_db(&pool).await;
 
         Self {
             db_name,
@@ -91,12 +95,14 @@ impl Drop for IntegrationTestDb {
         let template_connect_options = self.template_connect_options.clone();
         // Probably not the right way to run async code in drop, but it works
         tokio::task::spawn_blocking(move || {
+            let span = span!(tracing::Level::DEBUG, "test_db", test_db = db_name.as_str());
+            let _enter = span.enter();
             actix_rt::System::new("Cleanup").block_on(async move {
                 let template_pool = db::new_pool_with(template_connect_options.clone())
                     .await
                     .unwrap();
                 drop_test_db(template_pool, &db_name).await;
-                info!(name = db_name.as_str(), "Dropped test db");
+                debug!("Dropped test db");
             });
         });
     }
