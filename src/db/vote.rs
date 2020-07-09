@@ -59,6 +59,28 @@ async fn get_vote_for_user(
     .wrap_err("Got error while retrieving vote for user")
 }
 
+async fn get_votes_for_issue(
+    executor: impl Executor<'_, Database = Postgres>,
+    issue_id: IssueId,
+) -> Result<Vec<InternalVote>, Report> {
+    sqlx::query_as!(
+        InternalVote,
+        r#"
+        SELECT
+            id as "id: _",
+            alternative_id as "alternative_id: _",
+            issue_id as "issue_id: _",
+            user_id as "user_id: _"
+        FROM votes
+        WHERE issue_id = $1
+        "#,
+        issue_id.0,
+    )
+    .fetch_all(executor)
+    .await
+    .wrap_err("Got error while retrieving votes for issue")
+}
+
 async fn insert_vote(
     executor: impl Executor<'_, Database = Postgres>,
     alternative_id: AlternativeId,
@@ -102,3 +124,20 @@ impl AsyncSpanHandler<AddVote> for DbExecutor {
     }
 }
 crate::span_message_async_impl!(AddVote, DbExecutor);
+
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "Result<Vec<InternalVote>, Report>")]
+pub struct VotesForIssue(pub IssueId);
+
+#[async_trait::async_trait]
+impl AsyncSpanHandler<VotesForIssue> for DbExecutor {
+    #[instrument]
+    async fn handle(msg: VotesForIssue) -> Result<Vec<InternalVote>, Report> {
+        debug!("Retrieving votes for issue");
+        let VotesForIssue(issue_id) = msg;
+
+        let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
+        get_votes_for_issue(&pool, issue_id).await
+    }
+}
+crate::span_message_async_impl!(VotesForIssue, DbExecutor);

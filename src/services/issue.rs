@@ -27,6 +27,7 @@ impl InternalIssue {
     fn from_db(
         issue: db::issue::InternalIssue,
         alternatives: Vec<db::alternative::InternalAlternative>,
+        votes: Vec<db::vote::InternalVote>,
     ) -> Self {
         Self {
             id: issue.id,
@@ -36,7 +37,7 @@ impl InternalIssue {
             max_voters: issue.max_voters,
             show_distribution: issue.show_distribution,
             alternatives,
-            votes: vec![],
+            votes,
         }
     }
 }
@@ -63,29 +64,37 @@ impl Actor for IssueService {
 #[rtype(result = "Result<Option<InternalIssue>, Report>")]
 pub struct ActiveIssue;
 
-async_message_handler_with_span!({
-    impl AsyncSpanHandler<ActiveIssue> for IssueService {
-        async fn handle(_msg: ActiveIssue) -> Result<Option<InternalIssue>, Report> {
-            info!("Sending active issue");
-            let issue: Option<db::issue::InternalIssue> = DbExecutor::from_registry()
-                .send(SpanMessage::new(db::issue::ActiveIssue()))
-                .await??;
-            match issue {
-                Some(issue) => {
-                    debug!("Issue found, retrieving alternatives {:#?}", id = issue.id);
-                    let alternatives: Vec<InternalAlternative> = DbExecutor::from_registry()
-                        .send(SpanMessage::new(db::alternative::AlternativesForIssueId(
-                            issue.id.clone(),
-                        )))
-                        .await??;
-                    debug!("Alternatives found {}", alternatives.len());
-                    Ok(Some(InternalIssue::from_db(issue, alternatives)))
-                }
-                None => Ok(None),
+#[async_trait::async_trait]
+impl AsyncSpanHandler<ActiveIssue> for IssueService {
+    async fn handle(_msg: ActiveIssue) -> Result<Option<InternalIssue>, Report> {
+        info!("Sending active issue");
+        let issue: Option<db::issue::InternalIssue> = DbExecutor::from_registry()
+            .send(SpanMessage::new(db::issue::ActiveIssue()))
+            .await??;
+        match issue {
+            Some(issue) => {
+                debug!(
+                    "Issue found, retrieving alternatives and votes {:#?}",
+                    id = issue.id
+                );
+                let (alternatives, votes) = tokio::join!(
+                    DbExecutor::from_registry().send(SpanMessage::new(
+                        db::alternative::AlternativesForIssueId(issue.id.clone(),)
+                    )),
+                    DbExecutor::from_registry()
+                        .send(SpanMessage::new(db::vote::VotesForIssue(issue.id.clone(),))),
+                );
+                let alternatives = alternatives??;
+                let votes = votes??;
+                debug!("Alternatives found {}", alternatives.len());
+                debug!("Votes found {}", votes.len());
+                Ok(Some(InternalIssue::from_db(issue, alternatives, votes)))
             }
+            None => Ok(None),
         }
     }
-});
+}
+crate::span_message_async_impl!(ActiveIssue, IssueService);
 
 impl Supervised for IssueService {}
 impl ArbiterService for IssueService {}
