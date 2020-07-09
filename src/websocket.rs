@@ -26,6 +26,7 @@ pub struct IncomingLogin {
 #[derive(Serialize, Deserialize)]
 pub struct IncomingVote {
     pub alternative_id: AlternativeId,
+    pub issue_id: IssueId,
     pub user_id: Option<UserId>, // Used for fake voting
 }
 #[derive(Serialize, Deserialize)]
@@ -152,6 +153,7 @@ async fn handle_vote(vote: IncomingVote) -> Result<(), Report> {
     vote_actor
         .send(SpanMessage::new(IncomingVoteMessage(
             user_id,
+            vote.issue_id,
             alternative_id,
         )))
         .await
