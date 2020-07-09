@@ -1,6 +1,8 @@
 use dotenv::dotenv;
 use lazy_static::lazy_static;
+use sqlx::Executor;
 use sqlx::{postgres::PgConnectOptions, PgPool};
+use std::fs;
 use tokio::sync::Mutex;
 use tracing::info;
 use vaas_server::db;
@@ -16,16 +18,24 @@ async fn create_test_db(pool: PgPool, test_db: &str) {
         .execute(&pool)
         .await
         .unwrap();
-    let current = sqlx::query!("SELECT current_database()")
-        .fetch_one(&pool)
-        .await
-        .unwrap()
-        .current_database
-        .unwrap();
-    sqlx::query(&format!("CREATE DATABASE {} TEMPLATE {}", test_db, current))
+    sqlx::query(&format!("CREATE DATABASE {}", test_db))
         .execute(&pool)
         .await
         .unwrap();
+}
+
+async fn init_test_db(pool: &PgPool, test_db: &str) {
+    let mut resources: Vec<fs::DirEntry> = fs::read_dir("resources")
+        .unwrap()
+        .map(|entry| entry.unwrap())
+        .collect();
+    resources.sort_by_key(|r| r.file_name());
+    info!(name = test_db, "Executing init SQL in test db");
+    for resource in resources {
+        pool.execute(fs::read_to_string(resource.path()).unwrap().as_str())
+            .await
+            .unwrap();
+    }
 }
 
 async fn drop_test_db(pool: PgPool, test_db: &str) {
@@ -50,8 +60,8 @@ impl IntegrationTestDb {
             .expect("DATABASE_URL must be set")
             .parse()
             .unwrap();
-        // Creating test database with random name by copying original
-        // TODO: should probably create this from scratch by using the table schemas instead
+
+        // Creating test database with random name
         let db_name = format!("integration_{}", uuid::Uuid::new_v4().to_simple());
         let template_pool = db::new_pool_with(template_connect_options.clone())
             .await
@@ -60,6 +70,7 @@ impl IntegrationTestDb {
 
         let integration_pool = template_connect_options.clone().database(&db_name);
         let pool = db::new_pool_with(integration_pool).await.unwrap();
+        init_test_db(&pool, &db_name).await;
 
         Self {
             db_name,

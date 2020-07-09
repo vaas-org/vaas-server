@@ -1,4 +1,3 @@
-use crate::async_message_handler_with_span;
 use crate::{
     db::{
         self, alternative::InternalAlternative, issue::InternalIssueState, vote::InternalVote,
