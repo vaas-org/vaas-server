@@ -82,7 +82,7 @@ pub struct OutgoingClient {
 
 #[derive(Serialize, Deserialize)]
 pub struct Issue {
-    id: Option<IssueId>,
+    pub id: Option<IssueId>,
     pub title: String,
     description: String,
     state: Option<IssueState>,
