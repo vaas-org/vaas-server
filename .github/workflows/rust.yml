@@ -42,9 +42,7 @@ jobs:
         version: 0.1.0-beta.1
         use-tool-cache: true
     - name: Migrate
-      uses: actions-rs/cargo@v1
-      with:
-        command: sqlx migrate run
+      run: cargo sqlx migrate run
       env:
         DATABASE_URL: postgres://postgres:postgres@localhost
     - name: Build
