@@ -29,13 +29,13 @@ async fn create_test_db(pool: PgPool, test_db: &str) {
 
 // TODO: add these fixtures using code instead
 async fn init_fixtures_test_db(pool: &PgPool) {
-    let mut resources: Vec<fs::DirEntry> = fs::read_dir("resources")
+    let mut fixtures: Vec<fs::DirEntry> = fs::read_dir("fixtures")
         .unwrap()
         .map(|entry| entry.unwrap())
         .collect();
-    resources.sort_by_key(|r| r.file_name());
+    fixtures.sort_by_key(|r| r.file_name());
     debug!("Executing init SQL in test db");
-    for resource in resources {
+    for resource in fixtures {
         pool.execute(fs::read_to_string(resource.path()).unwrap().as_str())
             .await
             .unwrap();
