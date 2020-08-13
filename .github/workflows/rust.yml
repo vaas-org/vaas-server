@@ -36,6 +36,17 @@ jobs:
         profile: minimal
         toolchain: stable
         components: rustfmt, clippy
+    - uses: actions-rs/install@v0.1
+      with:
+        crate: sqlx-cli
+        version: 0.1.0-beta.1
+        use-tool-cache: true
+    - name: Migrate
+      uses: actions-rs/cargo@v1
+      with:
+        command: sqlx migrate run
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost
     - name: Build
       uses: actions-rs/cargo@v1
       with:
