@@ -6,11 +6,12 @@ use crate::{
 };
 use actix::prelude::*;
 use color_eyre::eyre::Report;
+use db::issue::IssueId;
 use tracing::{debug, info};
 
 #[derive(Message)]
 #[rtype(result = "Result<(), Report>")]
-pub struct IncomingVoteMessage(pub UserId, pub AlternativeId);
+pub struct IncomingVoteMessage(pub UserId, pub IssueId, pub AlternativeId);
 
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
@@ -44,10 +45,14 @@ async_message_handler_with_span!({
     impl AsyncSpanHandler<IncomingVoteMessage> for VoteActor {
         async fn handle(msg: IncomingVoteMessage) -> Result<(), Report> {
             debug!("VoteActor handling IncomingVoteMessage");
-            let IncomingVoteMessage(user_id, alternative_id) = msg;
+            let IncomingVoteMessage(user_id, issue_id, alternative_id) = msg;
 
             let vote = DbExecutor::from_registry()
-                .send(SpanMessage::new(db::vote::AddVote(user_id, alternative_id)))
+                .send(SpanMessage::new(db::vote::AddVote(
+                    user_id,
+                    issue_id,
+                    alternative_id,
+                )))
                 .await??;
 
             let broadcast = BroadcastActor::from_registry();

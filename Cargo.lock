@@ -2583,6 +2583,7 @@ dependencies = [
  "dotenv",
  "futures",
  "insta",
+ "lazy_static",
  "pin-project",
  "serde",
  "serde_json",

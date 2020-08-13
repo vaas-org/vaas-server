@@ -3,31 +3,35 @@ use actix_codec::Framed;
 use actix_http::ws::Codec;
 use actix_web::{test, App};
 use actix_web_actors::ws;
-use dotenv::dotenv;
 use futures::{SinkExt, StreamExt};
 use insta::assert_ron_snapshot;
-use sqlx::PgPool;
 use std::env;
+use std::sync::Once;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time::timeout;
-use vaas_server::{db, server, websocket};
+use vaas_server::{server, websocket};
 use websocket::{IncomingLogin, IncomingMessage, IncomingReconnect, IncomingVote, OutgoingMessage};
+
+mod integration_db;
+use integration_db::IntegrationTestDb;
 
 const READ_TIMEOUT_MS: u64 = 400;
 
-use std::sync::Once;
-
 static INIT: Once = Once::new();
 
-pub fn setup_once() {
-    use tracing::Level;
+fn setup_once() {
     use tracing_error::ErrorLayer;
     use tracing_subscriber::prelude::*;
+    use tracing_subscriber::{filter::LevelFilter, EnvFilter};
     INIT.call_once(|| {
         // Global tracing subscriber
         let subscriber = tracing_subscriber::fmt()
-            .with_max_level(Level::INFO)
+            .with_env_filter(
+                EnvFilter::from_default_env()
+                    .add_directive("[test_db]=trace".parse().unwrap())
+                    .add_directive(LevelFilter::INFO.into()),
+            )
             .finish()
             .with(ErrorLayer::default());
         tracing::subscriber::set_global_default(subscriber).unwrap();
@@ -68,18 +72,12 @@ async fn read_messages(
     messages
 }
 
-async fn pg_pool() -> PgPool {
-    // TODO: read from some shared config
-    dotenv().ok();
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL not set");
-    db::new_pool(&database_url).await.unwrap()
-}
-
 #[actix_rt::test]
 async fn test_login_user() {
     setup_once();
     // Setup test serve
-    let pool = pg_pool().await;
+    let test_db = IntegrationTestDb::new().await;
+    let pool = test_db.pool();
     let mut srv = test::start(move || {
         server::register_db_actor(pool.clone());
         server::register_system_actors();
@@ -104,7 +102,8 @@ async fn test_login_user() {
 async fn test_reconnect() {
     setup_once();
     // Setup test server
-    let pool = pg_pool().await;
+    let test_db = IntegrationTestDb::new().await;
+    let pool = test_db.pool();
     let mut srv = test::start(move || {
         server::register_db_actor(pool.clone());
         server::register_system_actors();
@@ -153,7 +152,8 @@ async fn test_reconnect() {
 async fn test_vote() {
     setup_once();
     // Setup test server
-    let pool = pg_pool().await;
+    let test_db = IntegrationTestDb::new().await;
+    let pool = test_db.pool();
     let mut srv = test::start(move || {
         server::register_db_actor(pool.clone());
         server::register_system_actors();
@@ -177,6 +177,7 @@ async fn test_vote() {
     // Send vote
     let message = IncomingMessage::Vote(IncomingVote {
         user_id: None,
+        issue_id: issue.id.clone().unwrap(),
         alternative_id: alternative_id.clone(),
     });
     let message = serde_json::to_string(&message).unwrap();
@@ -203,7 +204,8 @@ async fn test_vote() {
 async fn test_connect() {
     setup_once();
     // Setup test server
-    let pool = pg_pool().await;
+    let test_db = IntegrationTestDb::new().await;
+    let pool = test_db.pool();
     let mut srv = test::start(move || {
         server::register_db_actor(pool.clone());
         server::register_system_actors();

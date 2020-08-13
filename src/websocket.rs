@@ -26,6 +26,7 @@ pub struct IncomingLogin {
 #[derive(Serialize, Deserialize)]
 pub struct IncomingVote {
     pub alternative_id: AlternativeId,
+    pub issue_id: IssueId,
     pub user_id: Option<UserId>, // Used for fake voting
 }
 #[derive(Serialize, Deserialize)]
@@ -81,7 +82,7 @@ pub struct OutgoingClient {
 
 #[derive(Serialize, Deserialize)]
 pub struct Issue {
-    id: Option<IssueId>,
+    pub id: Option<IssueId>,
     pub title: String,
     description: String,
     state: Option<IssueState>,
@@ -136,7 +137,7 @@ fn report_error(report: Report) {
 }
 
 async fn handle_vote(vote: IncomingVote) -> Result<(), Report> {
-    let span = span!(Level::INFO, "vote", alternative_id = ?vote.alternative_id);
+    let span = span!(Level::DEBUG, "vote", alternative_id = ?vote.alternative_id);
     let _enter = span.enter();
     debug!("Incoming vote");
     let vote_actor = VoteActor::from_registry();
@@ -152,6 +153,7 @@ async fn handle_vote(vote: IncomingVote) -> Result<(), Report> {
     vote_actor
         .send(SpanMessage::new(IncomingVoteMessage(
             user_id,
+            vote.issue_id,
             alternative_id,
         )))
         .await
