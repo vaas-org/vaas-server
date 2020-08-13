@@ -53,6 +53,7 @@ jobs:
       with:
         command: test
       env:
+        SQLX_OFFLINE: true
         DATABASE_URL: postgres://postgres:postgres@localhost
     - name: Run cargo fmt
       uses: actions-rs/cargo@v1
