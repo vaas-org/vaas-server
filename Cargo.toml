@@ -21,7 +21,7 @@ tracing-subscriber = "0.2.5"
 tracing-futures = "0.2.4"
 actix-interop = "0.1.1"
 pin-project = "0.4.17"
-sqlx = { version = "0.4.0-beta.1", default-features = false, features = [ "runtime-tokio", "macros", "postgres", "uuid" ] }
+sqlx = { version = "0.4.0-beta.1", default-features = false, features = [ "runtime-actix", "macros", "postgres", "uuid", "offline", "migrate" ] }
 dotenv = "0.15.0"
 color-eyre = "0.5.0"
 tracing-error = "0.1.2"

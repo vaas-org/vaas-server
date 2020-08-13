@@ -519,6 +519,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "build_const"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39092a32794787acd8525ee150305ff051b0aa6cc2abaf193924f5ab05425f39"
+
+[[package]]
 name = "byte-tools"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -671,6 +677,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d375c433320f6c5057ae04a04376eef4d04ce2801448cf8863a78da99107be4"
 
 [[package]]
+name = "crc"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d663548de7f5cca343f1e0a48d14dcfb0e9eb4e079ec58883b7251539fa10aeb"
+dependencies = [
+ "build_const",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -773,6 +788,9 @@ name = "either"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "encode_unicode"
@@ -1908,6 +1926,7 @@ version = "1.0.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec2c5d7e739bc07a3e73381a39d61fdb5f671c60c1df26a130690665803d8226"
 dependencies = [
+ "indexmap",
  "itoa",
  "ryu",
  "serde",
@@ -2056,6 +2075,7 @@ dependencies = [
  "bitflags",
  "byteorder",
  "bytes",
+ "crc",
  "crossbeam-channel",
  "crossbeam-queue",
  "crossbeam-utils",
@@ -2076,6 +2096,7 @@ dependencies = [
  "parking_lot 0.11.0",
  "percent-encoding",
  "rand",
+ "serde",
  "sha-1 0.9.1",
  "sha2",
  "smallvec",
@@ -2098,8 +2119,12 @@ dependencies = [
  "either",
  "futures",
  "heck",
+ "hex",
  "proc-macro2",
  "quote",
+ "serde",
+ "serde_json",
+ "sha2",
  "sqlx-core",
  "sqlx-rt",
  "syn",
@@ -2112,6 +2137,8 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23f9104f6116b568358f315e9839ae66c4ebbc0e974db5580105f0acfeb4863f"
 dependencies = [
+ "actix-rt",
+ "actix-threadpool",
  "native-tls",
  "once_cell",
  "tokio",
