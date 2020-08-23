@@ -1,3 +1,4 @@
+-- Add migration script here
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -22,7 +23,7 @@ CREATE TABLE IF NOT EXISTS alternatives (
 
 CREATE TABLE IF NOT EXISTS sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID references users(id)
+    user_id UUID references users(id) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS votes (

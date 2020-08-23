@@ -1,6 +1,5 @@
 use super::DbExecutor;
-use crate::async_message_handler_with_span;
-use crate::span::AsyncSpanHandler;
+use crate::{span::AsyncSpanHandler, span_message_async_impl};
 use actix::prelude::*;
 use actix_interop::with_ctx;
 use color_eyre::eyre::Report;
@@ -40,45 +39,45 @@ pub struct InternalUser {
 #[rtype(result = "Result<Option<InternalUser>, Report>")]
 pub struct UserByUsername(pub String);
 
-async_message_handler_with_span!({
-    impl AsyncSpanHandler<UserByUsername> for DbExecutor {
-        async fn handle(msg: UserByUsername) -> Result<Option<InternalUser>, Report> {
-            debug!("Handling connect");
-            let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
-            let username = msg.0;
-            let user = sqlx::query_as!(
-                InternalUser,
-                r#"SELECT id as "id: _", username FROM users WHERE username = $1"#,
-                username
-            )
-            .fetch_optional(&pool)
-            .await?;
+#[async_trait::async_trait]
+impl AsyncSpanHandler<UserByUsername> for DbExecutor {
+    async fn handle(msg: UserByUsername) -> Result<Option<InternalUser>, Report> {
+        debug!("Handling connect");
+        let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
+        let username = msg.0;
+        let user = sqlx::query_as!(
+            InternalUser,
+            r#"SELECT id as "id: _", username FROM users WHERE username = $1"#,
+            username
+        )
+        .fetch_optional(&pool)
+        .await?;
 
-            Ok(user)
-        }
+        Ok(user)
     }
-});
+}
+span_message_async_impl!(UserByUsername, DbExecutor);
 
 #[derive(Message, Clone)]
 #[rtype(result = "Result<Option<InternalUser>, Report>")]
 pub struct UserById(pub UserId);
 
-async_message_handler_with_span!({
-    impl AsyncSpanHandler<UserById> for DbExecutor {
-        async fn handle(msg: UserById) -> Result<Option<InternalUser>, Report> {
-            debug!("Handling connect");
-            let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
-            let user_id = msg.0;
-            let uuid = user_id.0;
-            let user = sqlx::query_as!(
-                InternalUser,
-                r#"SELECT id as "id: _", username FROM users WHERE id = $1"#,
-                uuid
-            )
-            .fetch_optional(&pool)
-            .await?;
+#[async_trait::async_trait]
+impl AsyncSpanHandler<UserById> for DbExecutor {
+    async fn handle(msg: UserById) -> Result<Option<InternalUser>, Report> {
+        debug!("Handling connect");
+        let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
+        let user_id = msg.0;
+        let uuid = user_id.0;
+        let user = sqlx::query_as!(
+            InternalUser,
+            r#"SELECT id as "id: _", username FROM users WHERE id = $1"#,
+            uuid
+        )
+        .fetch_optional(&pool)
+        .await?;
 
-            Ok(user)
-        }
+        Ok(user)
     }
-});
+}
+span_message_async_impl!(UserById, DbExecutor);

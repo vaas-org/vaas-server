@@ -1,0 +1,354 @@
+{
+  "db": "PostgreSQL",
+  "1de1ab64cbee41307b9213cd89861e6c50613f0612a2f00f54bcb8592f5552b0": {
+    "query": "SELECT id as \"id: _\", user_id as \"user_id: _\" FROM sessions WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_id: _",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "7154e1b033bc8e38600d12d2d41f8723a9cbfa11b5505f29c51455e59fee1184": {
+    "query": "\n        SELECT\n            id as \"id: _\",\n            alternative_id as \"alternative_id: _\",\n            issue_id as \"issue_id: _\",\n            user_id as \"user_id: _\"\n        FROM votes\n        WHERE user_id= $1 AND issue_id = $2\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "alternative_id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "issue_id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "user_id: _",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "918c847b64ee306dad17c791cf8c9344b94b4d8773fad8ec215ae4296022746c": {
+    "query": "\n        INSERT INTO votes (alternative_id, issue_id, user_id) VALUES($1, $2, $3)\n        RETURNING id as \"id: _\", alternative_id as \"alternative_id: _\", issue_id as \"issue_id: _\", user_id as \"user_id: _\"\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "alternative_id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "issue_id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "user_id: _",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "aa1c38afd46ef40e527ba96db4a0551cb933a86d0453ef99828b5f721d14b51d": {
+    "query": "\n                    SELECT id as \"id: _\", title, description, state as \"state: _\", max_voters, show_distribution\n                    FROM issues WHERE id = $1\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "title",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "description",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "state: _",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 4,
+          "name": "max_voters",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "show_distribution",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "b11c6928b2d9aa427ec6489ce7a4b2331460968734575c257a98543d5df76a02": {
+    "query": "\n                INSERT INTO sessions (user_id) VALUES($1)\n                RETURNING id as \"id: _\", user_id as \"user_id: _\"\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "user_id: _",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "c0406c133f8f8604be0bc8aa05cc835a68902b1bb125c31f6680d4a0cc503877": {
+    "query": "SELECT id as \"id: _\", username FROM users WHERE username = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "username",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "c7200950c255ed4a2058c8647632ed72ef82b657abea44d9fd7c4941f36daa4a": {
+    "query": "SELECT id as \"id: _\", username FROM users WHERE id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "username",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "d35f5dc762b322db9d1200890b5726159aae7f53ef2329936bbe276d9cb7577e": {
+    "query": "\n                SELECT id as \"id: _\", title, issue_id as \"issue_id: _\"\n                FROM alternatives\n                WHERE issue_id = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "title",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "issue_id: _",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "fa61af4237cec94c5799e8e3ebfa6667cd420746fde08340dbe2258f767940b0": {
+    "query": "\n                    SELECT id as \"id: _\", title, description, state as \"state: _\", max_voters, show_distribution\n                    FROM issues\n                    ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "title",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "description",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "state: _",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 4,
+          "name": "max_voters",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 5,
+          "name": "show_distribution",
+          "type_info": "Bool"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "ffca10896f86c183688f4bfe36280ea72e8dd1cb9683624d104f550967bedb0b": {
+    "query": "\n        SELECT\n            id as \"id: _\",\n            alternative_id as \"alternative_id: _\",\n            issue_id as \"issue_id: _\",\n            user_id as \"user_id: _\"\n        FROM votes\n        WHERE issue_id = $1\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "alternative_id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "issue_id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 3,
+          "name": "user_id: _",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  }
+}

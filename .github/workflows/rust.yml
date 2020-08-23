@@ -41,16 +41,19 @@ jobs:
       with:
         command: build
       env:
-        DATABASE_URL: postgres://postgres:postgres@localhost
+        SQLX_OFFLINE: true
     - name: Annotate commit with clippy warnings
       uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        SQLX_OFFLINE: true
     - name: Test
       uses: actions-rs/cargo@v1
       with:
         command: test
       env:
+        SQLX_OFFLINE: true
         DATABASE_URL: postgres://postgres:postgres@localhost
     - name: Run cargo fmt
       uses: actions-rs/cargo@v1

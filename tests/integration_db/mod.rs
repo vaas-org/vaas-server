@@ -1,8 +1,10 @@
+use color_eyre::eyre::Error;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
+use sqlx::migrate::Migrate;
 use sqlx::Executor;
-use sqlx::{postgres::PgConnectOptions, PgPool};
-use std::fs;
+use sqlx::{migrate::Migrator, postgres::PgConnectOptions, PgPool};
+use std::{fs, path::Path};
 use tokio::sync::Mutex;
 use tracing::{debug, span};
 use vaas_server::db;
@@ -25,18 +27,32 @@ async fn create_test_db(pool: PgPool, test_db: &str) {
         .unwrap();
 }
 
-async fn init_test_db(pool: &PgPool) {
-    let mut resources: Vec<fs::DirEntry> = fs::read_dir("resources")
+// TODO: add these fixtures using code instead
+async fn init_fixtures_test_db(pool: &PgPool) {
+    let mut fixtures: Vec<fs::DirEntry> = fs::read_dir("fixtures")
         .unwrap()
         .map(|entry| entry.unwrap())
         .collect();
-    resources.sort_by_key(|r| r.file_name());
+    fixtures.sort_by_key(|r| r.file_name());
     debug!("Executing init SQL in test db");
-    for resource in resources {
+    for resource in fixtures {
         pool.execute(fs::read_to_string(resource.path()).unwrap().as_str())
             .await
             .unwrap();
     }
+}
+
+// based on sqlx-cli migrate run https://github.com/launchbadge/sqlx/blob/ec0e84d8ac5958444c6f7eb040cebe0d48d14483/sqlx-cli/src/migrate.rs#L60-L89
+async fn migrate_test_db(pool: &PgPool) -> Result<(), Error> {
+    let migrator = Migrator::new(Path::new("migrations")).await?;
+    let mut conn = pool.acquire().await?;
+    conn.ensure_migrations_table().await?;
+
+    // DB has just been created so all migrations can be applied
+    for migration in migrator.iter() {
+        conn.apply(migration).await?;
+    }
+    Ok(())
 }
 
 async fn drop_test_db(pool: PgPool, test_db: &str) {
@@ -74,7 +90,8 @@ impl IntegrationTestDb {
 
         let integration_pool = template_connect_options.clone().database(&db_name);
         let pool = db::new_pool_with(integration_pool).await.unwrap();
-        init_test_db(&pool).await;
+        migrate_test_db(&pool).await.unwrap();
+        init_fixtures_test_db(&pool).await;
 
         Self {
             db_name,
