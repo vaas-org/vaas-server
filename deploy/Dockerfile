@@ -4,6 +4,6 @@ COPY . .
 RUN SQLX_OFFLINE=true cargo install --path .
 
 FROM debian:buster-slim
-# RUN apt-get update && apt-get install -y extra-runtime-dependencies && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libssl1.1 && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/local/cargo/bin/vaas-server /usr/local/bin/vaas-server
 CMD ["vaas-server"]
