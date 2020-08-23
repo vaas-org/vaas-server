@@ -1,12 +1,13 @@
 use super::DbExecutor;
 use crate::async_message_handler_with_span;
 use crate::span::AsyncSpanHandler;
+use crate::websocket::Issue;
 use actix::prelude::*;
 use actix_interop::with_ctx;
-use color_eyre::eyre::Report;
+use color_eyre::eyre::{Report, WrapErr};
 use serde::{Deserialize, Serialize};
-use sqlx::types::Uuid;
-use tracing::debug;
+use sqlx::{types::Uuid, Executor, Postgres};
+use tracing::{debug, instrument};
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Deserialize, Serialize, sqlx::Type)]
 #[sqlx(transparent)]
@@ -33,7 +34,7 @@ pub enum InternalIssueState {
     Finished,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InternalIssue {
     pub id: IssueId,
     pub title: String,
@@ -88,3 +89,71 @@ async_message_handler_with_span!({
         }
     }
 });
+
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "Result<Option<InternalIssue>, Report>")]
+pub struct NewIssue(pub Issue);
+
+async fn insert_issue(
+    executor: impl Executor<'_, Database = Postgres>,
+    data: Issue,
+) -> Result<InternalIssue, Report> {
+    let issue_state = match data.state {
+        Some(state) => match state {
+            crate::websocket::IssueState::NotStarted => "not_started",
+            // crate::websocket::IssueState::NotStarted => crate::db::issue::InternalIssueState::NotStarted,
+            crate::websocket::IssueState::InProgress => "in_progress",
+            // crate::websocket::IssueState::InProgress => crate::db::issue::InternalIssueState::InProgress,
+            crate::websocket::IssueState::Finished => "finished",
+            // crate::websocket::IssueState::Finished => crate::db::issue::InternalIssueState::Finished,
+        },
+        None => "not_started",
+    };
+
+    // @ToDo: Get available voters
+    let max_voters = match data.max_voters {
+        Some(num) => num,
+        None => 1000,
+    };
+
+    sqlx::query_as!(
+        InternalIssue,
+        r#"
+                INSERT INTO issues ( title, description, state, max_voters, show_distribution )
+                VALUES ( $1, $2, $3, $4, $5 )
+                RETURNING
+                    id as "id: _",
+                    title as "title: _",
+                    description as "description: _",
+                    state as "state: _",
+                    max_voters as "max_voters: _",
+                    show_distribution as "show_distribution: _"
+                "#,
+        data.title,
+        data.description,
+        issue_state,
+        max_voters,
+        data.show_distribution
+    )
+    .fetch_one(executor)
+    .await
+    .wrap_err("Got error while adding new issue to db")
+}
+
+#[async_trait::async_trait]
+impl AsyncSpanHandler<NewIssue> for DbExecutor {
+    #[instrument]
+    async fn handle(_msg: NewIssue) -> Result<Option<InternalIssue>, Report> {
+        let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
+        debug!("Creating new issue in db");
+
+        let mut tx = pool.begin().await?;
+
+        let i = insert_issue(&mut tx, _msg.0).await?;
+
+        // Need to add alternatives too
+        tx.commit().await?;
+        Ok(Some(i))
+    }
+}
+crate::span_message_async_impl!(NewIssue, DbExecutor);
