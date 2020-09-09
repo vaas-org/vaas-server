@@ -29,7 +29,7 @@ async fn main() -> std::io::Result<()> {
         error!("Failed to install eyre {:#?}", err);
     }
 
-    let address = env::var("ADDRESS").unwrap_or("127.0.0.1:8080".to_string());
+    let address = env::var("ADDRESS").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
     // Create Http server with websocket support
     info!("Starting server on {}", address);
     HttpServer::new(move || App::new().configure(|app| server::configure(app)))
