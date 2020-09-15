@@ -131,5 +131,52 @@ impl AsyncSpanHandler<NewIssue> for IssueService {
 }
 crate::span_message_async_impl!(NewIssue, IssueService);
 
+#[derive(Message)]
+#[rtype(result = "Result<Option<Vec<InternalIssue>>, Report>")]
+pub struct ListAllIssues;
+
+#[async_trait::async_trait]
+impl AsyncSpanHandler<ListAllIssues> for IssueService {
+    async fn handle(_msg: ListAllIssues) -> Result<Option<Vec<InternalIssue>>, Report> {
+        debug!("Listing all issues");
+        let db_issues: Result<Option<Vec<db::issue::InternalIssue>>, _> =
+            DbExecutor::from_registry()
+                .send(SpanMessage::new(db::issue::ListAllIssues))
+                .await?;
+
+        let is = match db_issues {
+            Ok(issues) => match issues {
+                Some(issues) => {
+                    let mut converted = Vec::new();
+                    for issue in issues {
+                        debug!(
+                            "Issue found, retrieving alternatives and votes {:#?}",
+                            id = issue.id
+                        );
+                        let (alternatives, votes) = tokio::join!(
+                            DbExecutor::from_registry().send(SpanMessage::new(
+                                db::alternative::AlternativesForIssueId(issue.id.clone(),)
+                            )),
+                            DbExecutor::from_registry()
+                                .send(SpanMessage::new(db::vote::VotesForIssue(issue.id.clone(),))),
+                        );
+                        let alternatives = alternatives??;
+                        let votes = votes??;
+                        debug!("Alternatives found {}", alternatives.len());
+                        debug!("Votes found {}", votes.len());
+                        converted.push(InternalIssue::from_db(issue, alternatives, votes))
+                    }
+                    Some(converted)
+                }
+                None => None,
+            },
+            _error => None,
+        };
+
+        Ok(is)
+    }
+}
+crate::span_message_async_impl!(ListAllIssues, IssueService);
+
 impl Supervised for IssueService {}
 impl ArbiterService for IssueService {}

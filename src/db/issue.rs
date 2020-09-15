@@ -68,6 +68,31 @@ async_message_handler_with_span!({
 });
 
 #[derive(Message, Clone)]
+#[rtype(result = "Result<Option<Vec<InternalIssue>>, Report>")]
+pub struct ListAllIssues;
+
+async_message_handler_with_span!({
+    impl AsyncSpanHandler<ListAllIssues> for DbExecutor {
+        async fn handle(_msg: ListAllIssues) -> Result<Option<Vec<InternalIssue>>, Report> {
+            let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
+            debug!("Retrieving all issues");
+
+            let result = sqlx::query_as!(
+                InternalIssue,
+                r#"
+                SELECT id as "id: _", title, description, state as "state: _", max_voters, show_distribution
+                FROM issues
+                "#
+            )
+            .fetch_all(&pool)
+            .await?;
+
+            Ok(Some(result))
+        }
+    }
+});
+
+#[derive(Message, Clone)]
 #[rtype(result = "Result<Option<InternalIssue>, Report>")]
 pub struct ActiveIssue();
 

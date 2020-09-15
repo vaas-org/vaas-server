@@ -17,6 +17,10 @@ pub mod vote;
 #[rtype(result = "()")]
 pub struct ActiveIssue(pub issue::InternalIssue);
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct ListAllIssues(pub Vec<issue::InternalIssue>);
+
 #[derive(Message, Clone)]
 #[rtype(result = "Result<(), Report>")]
 pub struct Connect {

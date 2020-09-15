@@ -1,7 +1,7 @@
 use crate::services;
 use crate::services::broadcast::BroadcastActor;
 use crate::services::client::ClientActor;
-use crate::services::issue::{IssueService, NewIssue};
+use crate::services::issue::{IssueService, ListAllIssues, NewIssue};
 use crate::services::vote::{BroadcastVote, IncomingVoteMessage, VoteActor};
 use crate::services::{Login, Service};
 use crate::{db, db::DbExecutor, span::SpanMessage};
@@ -47,6 +47,9 @@ pub struct IncomingRegistration {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct IncomingListAllIssues;
+
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum IncomingMessage {
     #[serde(rename = "vote")]
@@ -59,6 +62,8 @@ pub enum IncomingMessage {
     CreateIssue(IncomingCreateIssue),
     #[serde(rename = "registration")]
     Registration(IncomingRegistration),
+    #[serde(rename = "list_all_issues")]
+    ListAllIssues,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -102,6 +107,11 @@ pub struct Issue {
     pub show_distribution: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Issues {
+    pub issues: Vec<Issue>,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum OutgoingMessage {
@@ -111,6 +121,8 @@ pub enum OutgoingMessage {
     Vote(OutgoingVote),
     #[serde(rename = "client")]
     Client(OutgoingClient),
+    #[serde(rename = "all_issues")]
+    AllIssues(Issues),
 }
 
 pub struct WsClient {
@@ -316,6 +328,80 @@ async fn handle_registration(registration: IncomingRegistration) -> Result<(), R
     Ok(())
 }
 
+async fn handle_list_all_issues() -> Result<(), Report> {
+    let span = span!(Level::DEBUG, "list_all_issues");
+    let _enter = span.enter();
+    debug!("Incoming ListAllIssues");
+    let issue_actor = IssueService::from_registry();
+    let _ = if let Some(user_id) = with_ctx(|act: &mut WsClient, _| act.user_id.clone()) {
+        user_id
+    } else {
+        return Err(eyre!(
+            "Not sure who the user who tried to list all issues is"
+        ));
+    };
+    let resp = issue_actor
+        .send(SpanMessage::new(ListAllIssues))
+        .await
+        .wrap_err("Error handling incoming list all issues")?;
+
+    // Send event back to client with the issues
+    match resp {
+        Ok(i) => {
+            with_ctx(|act: &mut WsClient, ctx| {
+                let issues = match i {
+                    Some(issues) => issues
+                        .into_iter()
+                        .map(|issue: services::issue::InternalIssue| Issue {
+                            id: Some(issue.id),
+                            title: issue.title,
+                            description: issue.description,
+                            alternatives: issue
+                                .alternatives
+                                .into_iter()
+                                .map(|alt: db::alternative::InternalAlternative| Alternative {
+                                    id: Some(alt.id),
+                                    title: alt.title,
+                                })
+                                .collect(),
+                            max_voters: Some(issue.max_voters),
+                            show_distribution: issue.show_distribution,
+                            state: match issue.state {
+                                db::issue::InternalIssueState::NotStarted => {
+                                    Some(IssueState::NotStarted)
+                                }
+                                db::issue::InternalIssueState::InProgress => {
+                                    Some(IssueState::InProgress)
+                                }
+                                db::issue::InternalIssueState::Finished => {
+                                    Some(IssueState::Finished)
+                                }
+                            },
+                            votes: Some(
+                                issue
+                                    .votes
+                                    .into_iter()
+                                    .map(|vote: db::vote::InternalVote| OutgoingVote {
+                                        id: vote.id,
+                                        user_id: vote.user_id,
+                                        alternative_id: vote.alternative_id,
+                                    })
+                                    .collect(),
+                            ),
+                        })
+                        .collect(),
+                    None => Vec::new(), // Don't send anything if we don't have any? or send empty?
+                };
+                act.send_json(ctx, &OutgoingMessage::AllIssues(Issues { issues }))
+            })
+            .wrap_err("Failed to send all issues to client")?;
+            Ok(())
+        }
+
+        _ => Ok(()), // how to handle error hmm
+    }
+}
+
 async fn handle_ws_message(text: String) -> Result<(), Report> {
     let m = serde_json::from_str(&text).wrap_err("JSON decode")?;
     match m {
@@ -324,6 +410,7 @@ async fn handle_ws_message(text: String) -> Result<(), Report> {
         IncomingMessage::Reconnect(reconnect) => handle_reconnect(reconnect).await,
         IncomingMessage::CreateIssue(issue) => handle_create_issue(issue).await,
         IncomingMessage::Registration(registration) => handle_registration(registration).await,
+        IncomingMessage::ListAllIssues => handle_list_all_issues().await,
     }
 }
 
@@ -424,6 +511,16 @@ impl Handler<services::ActiveIssue> for WsClient {
         if let Err(err) = res {
             report_error(err);
         }
+    }
+}
+
+impl Handler<services::ListAllIssues> for WsClient {
+    type Result = ();
+
+    fn handle(&mut self, msg: services::ListAllIssues, _: &mut Self::Context) {
+        debug!("Incoming 'list all issues' event");
+        let issues = msg.0;
+        debug!("We have this many issues: {}", issues.len());
     }
 }
 
