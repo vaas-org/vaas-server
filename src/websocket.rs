@@ -1,6 +1,7 @@
 use crate::services;
 use crate::services::broadcast::BroadcastActor;
 use crate::services::client::ClientActor;
+use crate::services::issue::{IssueService, NewIssue};
 use crate::services::vote::{BroadcastVote, IncomingVoteMessage, VoteActor};
 use crate::services::{Login, Service};
 use crate::{db, db::DbExecutor, span::SpanMessage};
@@ -60,8 +61,8 @@ pub enum IncomingMessage {
     Registration(IncomingRegistration),
 }
 
-#[derive(Serialize, Deserialize)]
-enum IssueState {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum IssueState {
     #[serde(rename = "notstarted")]
     NotStarted,
     #[serde(rename = "inprogress")]
@@ -70,13 +71,13 @@ enum IssueState {
     Finished,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Alternative {
     pub id: Option<AlternativeId>,
     pub title: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OutgoingVote {
     id: VoteId,
     pub alternative_id: AlternativeId,
@@ -89,16 +90,16 @@ pub struct OutgoingClient {
     pub username: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Issue {
     pub id: Option<IssueId>,
     pub title: String,
-    description: String,
-    state: Option<IssueState>,
+    pub description: String,
+    pub state: Option<IssueState>,
     pub alternatives: Vec<Alternative>,
-    votes: Option<Vec<OutgoingVote>>,
-    max_voters: Option<i32>,
-    show_distribution: bool,
+    pub votes: Option<Vec<OutgoingVote>>,
+    pub max_voters: Option<i32>,
+    pub show_distribution: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -255,7 +256,23 @@ async fn handle_create_issue(
     let span = span!(Level::DEBUG, "issue_create", issue = issue.title.as_str());
     let _enter = span.enter();
     debug!("Incoming CreateIssue");
-    Ok(())
+    let issue_actor = IssueService::from_registry();
+    let _ = if let Some(user_id) = with_ctx(|act: &mut WsClient, _| act.user_id.clone()) {
+        user_id
+    } else {
+        return Err(eyre!(
+            "Not sure who the user who tried to create an issue is"
+        ));
+    };
+    // @ToDo: Check if user is admin
+    let resp = issue_actor
+        .send(SpanMessage::new(NewIssue(issue)))
+        .await
+        .wrap_err("Error handling incoming new issue")?;
+    match resp {
+        Ok(_) => Ok(()), // respond back with issue maybe?
+        _ => Ok(()),     // how to handle error hmm
+    }
 }
 
 #[derive(Serialize, Deserialize)]

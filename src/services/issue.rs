@@ -1,3 +1,4 @@
+use crate::websocket::Issue;
 use crate::{
     db::{
         self, alternative::InternalAlternative, issue::InternalIssueState, vote::InternalVote,
@@ -94,6 +95,41 @@ impl AsyncSpanHandler<ActiveIssue> for IssueService {
     }
 }
 crate::span_message_async_impl!(ActiveIssue, IssueService);
+
+#[derive(Message)]
+#[rtype(result = "Result<Option<InternalIssue>, Report>")]
+pub struct NewIssue(pub Issue);
+
+#[async_trait::async_trait]
+impl AsyncSpanHandler<NewIssue> for IssueService {
+    async fn handle(_msg: NewIssue) -> Result<Option<InternalIssue>, Report> {
+        info!("Creating new issue");
+        let issue: Option<db::issue::InternalIssue> = DbExecutor::from_registry()
+            .send(SpanMessage::new(db::issue::NewIssue(_msg.0)))
+            .await??;
+        debug!("pog back from db stuff phew");
+        match issue {
+            Some(issue) => {
+                debug!("some back from db");
+                Ok(Some(InternalIssue {
+                    id: issue.id,
+                    alternatives: Vec::new(),
+                    description: issue.description,
+                    title: issue.title,
+                    max_voters: issue.max_voters,
+                    show_distribution: issue.show_distribution,
+                    state: issue.state,
+                    votes: Vec::new(),
+                }))
+            }
+            None => {
+                debug!("none back from db");
+                Ok(None)
+            }
+        }
+    }
+}
+crate::span_message_async_impl!(NewIssue, IssueService);
 
 impl Supervised for IssueService {}
 impl ArbiterService for IssueService {}
