@@ -26,60 +26,6 @@
       ]
     }
   },
-  "622be791b2f159f3f0a3c2a8132ba7fbbb84076022136a24b59834cba3ce56f2": {
-    "query": "\n                    INSERT INTO issues ( title, description, state, max_voters, show_distribution )\n                    VALUES ( $1, $2, $3, $4, $5 )\n                    RETURNING\n                        id as \"id: _\",\n                        title as \"title: _\",\n                        description as \"description: _\",\n                        state as \"state: _\",\n                        max_voters as \"max_voters: _\",\n                        show_distribution as \"show_distribution: _\"\n                    ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id: _",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "title: _",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "description: _",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "state: _",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 4,
-          "name": "max_voters: _",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "show_distribution: _",
-          "type_info": "Bool"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Text",
-          "Text",
-          "Int4",
-          "Bool"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "7154e1b033bc8e38600d12d2d41f8723a9cbfa11b5505f29c51455e59fee1184": {
     "query": "\n        SELECT\n            id as \"id: _\",\n            alternative_id as \"alternative_id: _\",\n            issue_id as \"issue_id: _\",\n            user_id as \"user_id: _\"\n        FROM votes\n        WHERE user_id= $1 AND issue_id = $2\n        ",
     "describe": {
@@ -336,6 +282,39 @@
         ]
       },
       "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "c09c43bb61171cea19890334a73b520aba79464c4073840c9b07ad8029978662": {
+    "query": "\n                INSERT INTO alternatives ( issue_id, title )\n                VALUES ( $1, $2 )\n                RETURNING\n                    id as \"id: _\",\n                    issue_id as \"issue_id: _\",\n                    title as \"title: _\"\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "issue_id: _",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "title: _",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
         false,
         false
       ]

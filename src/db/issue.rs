@@ -1,7 +1,7 @@
-use super::DbExecutor;
+use super::{alternative::InternalAlternative, DbExecutor};
 use crate::async_message_handler_with_span;
 use crate::span::AsyncSpanHandler;
-use crate::websocket::Issue;
+use crate::websocket::{Alternative, Issue};
 use actix::prelude::*;
 use actix_interop::with_ctx;
 use color_eyre::eyre::{Report, WrapErr};
@@ -96,9 +96,9 @@ pub struct NewIssue(pub Issue);
 
 async fn insert_issue(
     executor: impl Executor<'_, Database = Postgres>,
-    data: Issue,
+    data: &Issue,
 ) -> Result<InternalIssue, Report> {
-    let issue_state = match data.state {
+    let issue_state = match &data.state {
         Some(state) => match state {
             crate::websocket::IssueState::NotStarted => "not_started",
             // crate::websocket::IssueState::NotStarted => crate::db::issue::InternalIssueState::NotStarted,
@@ -140,6 +140,29 @@ async fn insert_issue(
     .wrap_err("Got error while adding new issue to db")
 }
 
+async fn insert_alternative(
+    executor: impl Executor<'_, Database = Postgres>,
+    data: &Alternative,
+    issue: &InternalIssue,
+) -> Result<InternalAlternative, Report> {
+    sqlx::query_as!(
+        InternalAlternative,
+        r#"
+                INSERT INTO alternatives ( issue_id, title )
+                VALUES ( $1, $2 )
+                RETURNING
+                    id as "id: _",
+                    issue_id as "issue_id: _",
+                    title as "title: _"
+            "#,
+        issue.id.0,
+        data.title
+    )
+    .fetch_one(executor)
+    .await
+    .wrap_err("Got error while adding new alternative to db")
+}
+
 #[async_trait::async_trait]
 impl AsyncSpanHandler<NewIssue> for DbExecutor {
     #[instrument]
@@ -149,9 +172,12 @@ impl AsyncSpanHandler<NewIssue> for DbExecutor {
 
         let mut tx = pool.begin().await?;
 
-        let i = insert_issue(&mut tx, _msg.0).await?;
+        let i = insert_issue(&mut tx, &_msg.0).await?;
 
-        // Need to add alternatives too
+        for alt in _msg.0.alternatives.iter() {
+            insert_alternative(&mut tx, alt, &i).await?;
+        }
+
         tx.commit().await?;
         Ok(Some(i))
     }
