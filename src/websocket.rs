@@ -12,6 +12,8 @@ use db::{
     alternative::AlternativeId,
     issue::IssueId,
     session::{InternalSession, SessionId},
+    user::NewInternalUser,
+    user::NewUser,
     user::{UserById, UserId},
     vote::{InternalVote, VoteId},
 };
@@ -39,6 +41,11 @@ pub struct IncomingReconnect {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct IncomingRegistration {
+    pub username: String,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum IncomingMessage {
     #[serde(rename = "vote")]
@@ -49,6 +56,8 @@ pub enum IncomingMessage {
     Reconnect(IncomingReconnect),
     #[serde(rename = "issue_create")]
     CreateIssue(IncomingCreateIssue),
+    #[serde(rename = "registration")]
+    Registration(IncomingRegistration),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -249,6 +258,47 @@ async fn handle_create_issue(
     Ok(())
 }
 
+#[derive(Serialize, Deserialize)]
+struct User {
+    pub id: UserId,
+    pub username: String,
+}
+
+async fn handle_registration(registration: IncomingRegistration) -> Result<(), Report> {
+    let span = span!(
+        Level::DEBUG,
+        "registration",
+        username = registration.username.as_str()
+    );
+    let _enter = span.enter();
+    debug!("Incoming UserRegistration");
+    let db_executor = DbExecutor::from_registry();
+    let user = db_executor
+        .send(SpanMessage::new(NewUser(NewInternalUser {
+            username: registration.username,
+        })))
+        .await??;
+    info!("Successfully registered user {:?}", user);
+    let session_actor = SessionActor::from_registry();
+    let session = session_actor
+        .send(SpanMessage::new(SaveSession(user.id.clone())))
+        .await??;
+    debug!("Created session");
+    with_ctx(|act: &mut WsClient, ctx| {
+        act.user_id = Some(user.id);
+        act.session_id = Some(session.id.clone());
+        act.send_json(
+            ctx,
+            &OutgoingMessage::Client(OutgoingClient {
+                id: session.id,
+                username: Some(user.username),
+            }),
+        )
+    })
+    .wrap_err("Failed to send client message on login")?;
+    Ok(())
+}
+
 async fn handle_ws_message(text: String) -> Result<(), Report> {
     let m = serde_json::from_str(&text).wrap_err("JSON decode")?;
     match m {
@@ -256,6 +306,7 @@ async fn handle_ws_message(text: String) -> Result<(), Report> {
         IncomingMessage::Login(login) => handle_login(login).await,
         IncomingMessage::Reconnect(reconnect) => handle_reconnect(reconnect).await,
         IncomingMessage::CreateIssue(issue) => handle_create_issue(issue).await,
+        IncomingMessage::Registration(registration) => handle_registration(registration).await,
     }
 }
 

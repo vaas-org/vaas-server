@@ -3,8 +3,9 @@ use crate::{span::AsyncSpanHandler, span_message_async_impl};
 use actix::prelude::*;
 use actix_interop::with_ctx;
 use color_eyre::eyre::Report;
+use color_eyre::eyre::WrapErr;
 use serde::{Deserialize, Serialize};
-use sqlx::types::Uuid;
+use sqlx::{types::Uuid, Executor, Postgres};
 use tracing::debug;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Deserialize, Serialize, sqlx::Type)]
@@ -81,3 +82,43 @@ impl AsyncSpanHandler<UserById> for DbExecutor {
     }
 }
 span_message_async_impl!(UserById, DbExecutor);
+
+#[derive(Clone, Debug)]
+pub struct NewInternalUser {
+    pub username: String,
+}
+
+#[derive(Message, Clone)]
+#[rtype(result = "Result<InternalUser, Report>")]
+pub struct NewUser(pub NewInternalUser);
+
+async fn insert_new_user(
+    executor: impl Executor<'_, Database = Postgres>,
+    data: NewInternalUser,
+) -> Result<InternalUser, Report> {
+    sqlx::query_as!(
+        InternalUser,
+        r#"
+        INSERT INTO users ( username )
+        VALUES ( $1 )
+        RETURNING
+            id as "id: _",
+            username as "username: _"
+        "#,
+        data.username,
+    )
+    .fetch_one(executor)
+    .await
+    .wrap_err("Got error while adding new issue to db")
+}
+
+#[async_trait::async_trait]
+impl AsyncSpanHandler<NewUser> for DbExecutor {
+    async fn handle(msg: NewUser) -> Result<InternalUser, Report> {
+        debug!("Handling connect");
+        let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
+
+        insert_new_user(&pool, msg.0).await
+    }
+}
+span_message_async_impl!(NewUser, DbExecutor);
