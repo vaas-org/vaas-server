@@ -301,6 +301,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsClient {
                     debug!("Got close message from WS. Reason: {:#?}", reason);
                     ctx.close(reason)
                 }
+                ws::Message::Ping(msg) => ctx.pong(&msg),
                 message => {
                     warn!("Client sent something else than text: {:#?}", message);
                 }
