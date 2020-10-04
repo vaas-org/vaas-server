@@ -31,7 +31,28 @@ impl Default for IssueId {
 pub enum InternalIssueState {
     NotStarted,
     InProgress,
+    VotingFinished,
     Finished,
+}
+
+impl InternalIssueState {
+    pub fn to_websocket(self) -> IssueState {
+        return match self {
+            InternalIssueState::NotStarted => crate::websocket::IssueState::NotStarted,
+            InternalIssueState::InProgress => crate::websocket::IssueState::InProgress,
+            InternalIssueState::VotingFinished => crate::websocket::IssueState::VotingFinished,
+            InternalIssueState::Finished => crate::websocket::IssueState::Finished,
+        };
+    }
+
+    fn to_db(self) -> &'static str {
+        return match self {
+            InternalIssueState::NotStarted => "not_started",
+            InternalIssueState::InProgress => "in_progress",
+            InternalIssueState::VotingFinished => "voting_finished",
+            InternalIssueState::Finished => "finished",
+        };
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -124,15 +145,8 @@ async fn insert_issue(
     data: &Issue,
 ) -> Result<InternalIssue, Report> {
     let issue_state = match &data.state {
-        Some(state) => match state {
-            crate::websocket::IssueState::NotStarted => "not_started",
-            // crate::websocket::IssueState::NotStarted => crate::db::issue::InternalIssueState::NotStarted,
-            crate::websocket::IssueState::InProgress => "in_progress",
-            // crate::websocket::IssueState::InProgress => crate::db::issue::InternalIssueState::InProgress,
-            crate::websocket::IssueState::Finished => "finished",
-            // crate::websocket::IssueState::Finished => crate::db::issue::InternalIssueState::Finished,
-        },
-        None => "not_started",
+        Some(state) => state.to_owned().to_internal(),
+        None => InternalIssueState::NotStarted,
     };
 
     // @ToDo: Get available voters
@@ -156,7 +170,7 @@ async fn insert_issue(
                 "#,
         data.title,
         data.description,
-        issue_state,
+        issue_state.to_db(), // why doesnt sqlx fix this :thinking:
         max_voters,
         data.show_distribution
     )

@@ -72,8 +72,21 @@ pub enum IssueState {
     NotStarted,
     #[serde(rename = "inprogress")]
     InProgress,
+    #[serde(rename = "votingfinished")]
+    VotingFinished,
     #[serde(rename = "finished")]
     Finished,
+}
+
+impl IssueState {
+    pub fn to_internal(self) -> db::issue::InternalIssueState {
+        return match self {
+            IssueState::NotStarted => db::issue::InternalIssueState::NotStarted,
+            IssueState::InProgress => db::issue::InternalIssueState::InProgress,
+            IssueState::VotingFinished => db::issue::InternalIssueState::VotingFinished,
+            IssueState::Finished => db::issue::InternalIssueState::Finished,
+        };
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -366,17 +379,7 @@ async fn handle_list_all_issues() -> Result<(), Report> {
                                 .collect(),
                             max_voters: Some(issue.max_voters),
                             show_distribution: issue.show_distribution,
-                            state: match issue.state {
-                                db::issue::InternalIssueState::NotStarted => {
-                                    Some(IssueState::NotStarted)
-                                }
-                                db::issue::InternalIssueState::InProgress => {
-                                    Some(IssueState::InProgress)
-                                }
-                                db::issue::InternalIssueState::Finished => {
-                                    Some(IssueState::Finished)
-                                }
-                            },
+                            state: Some(issue.state.to_websocket()),
                             votes: Some(
                                 issue
                                     .votes
@@ -480,11 +483,7 @@ impl Handler<services::ActiveIssue> for WsClient {
                 id: Some(issue.id),
                 title: issue.title,
                 description: issue.description,
-                state: match issue.state {
-                    db::issue::InternalIssueState::NotStarted => Some(IssueState::NotStarted),
-                    db::issue::InternalIssueState::InProgress => Some(IssueState::InProgress),
-                    db::issue::InternalIssueState::Finished => Some(IssueState::Finished),
-                },
+                state: Some(issue.state.to_websocket()),
                 alternatives: issue
                     .alternatives
                     .into_iter()
