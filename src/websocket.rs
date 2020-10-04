@@ -1,7 +1,7 @@
 use crate::services;
 use crate::services::broadcast::BroadcastActor;
 use crate::services::client::ClientActor;
-use crate::services::issue::{IssueService, ListAllIssues, NewIssue};
+use crate::services::issue::{IssueService, ListAllIssues, NewIssue, SetIssueState};
 use crate::services::vote::{BroadcastVote, IncomingVoteMessage, VoteActor};
 use crate::services::{Login, Service};
 use crate::{db, db::DbExecutor, span::SpanMessage};
@@ -50,6 +50,12 @@ pub struct IncomingRegistration {
 pub struct IncomingListAllIssues;
 
 #[derive(Serialize, Deserialize)]
+pub struct IncomingSetIssueState {
+    pub issue_id: IssueId,
+    pub state: IssueState,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum IncomingMessage {
     #[serde(rename = "vote")]
@@ -64,6 +70,8 @@ pub enum IncomingMessage {
     Registration(IncomingRegistration),
     #[serde(rename = "list_all_issues")]
     ListAllIssues,
+    #[serde(rename = "set_issue_state")]
+    SetIssueState(IncomingSetIssueState),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -72,8 +80,21 @@ pub enum IssueState {
     NotStarted,
     #[serde(rename = "inprogress")]
     InProgress,
+    #[serde(rename = "votingfinished")]
+    VotingFinished,
     #[serde(rename = "finished")]
     Finished,
+}
+
+impl IssueState {
+    pub fn to_internal(self) -> db::issue::InternalIssueState {
+        return match self {
+            IssueState::NotStarted => db::issue::InternalIssueState::NotStarted,
+            IssueState::InProgress => db::issue::InternalIssueState::InProgress,
+            IssueState::VotingFinished => db::issue::InternalIssueState::VotingFinished,
+            IssueState::Finished => db::issue::InternalIssueState::Finished,
+        };
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -112,6 +133,13 @@ pub struct Issues {
     pub issues: Vec<Issue>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OutgoingSetIssueState {
+    pub issue: Issue,
+    // From state,
+    // to state?
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum OutgoingMessage {
@@ -123,6 +151,8 @@ pub enum OutgoingMessage {
     Client(OutgoingClient),
     #[serde(rename = "all_issues")]
     AllIssues(Issues),
+    #[serde(rename = "set_issue_state")]
+    SetIssueState(OutgoingSetIssueState),
 }
 
 pub struct WsClient {
@@ -366,17 +396,7 @@ async fn handle_list_all_issues() -> Result<(), Report> {
                                 .collect(),
                             max_voters: Some(issue.max_voters),
                             show_distribution: issue.show_distribution,
-                            state: match issue.state {
-                                db::issue::InternalIssueState::NotStarted => {
-                                    Some(IssueState::NotStarted)
-                                }
-                                db::issue::InternalIssueState::InProgress => {
-                                    Some(IssueState::InProgress)
-                                }
-                                db::issue::InternalIssueState::Finished => {
-                                    Some(IssueState::Finished)
-                                }
-                            },
+                            state: Some(issue.state.to_websocket()),
                             votes: Some(
                                 issue
                                     .votes
@@ -402,6 +422,81 @@ async fn handle_list_all_issues() -> Result<(), Report> {
     }
 }
 
+//async fn handle_create_issue(
+//IncomingCreateIssue { issue }: IncomingCreateIssue,//) -> Result<(), Report> {
+async fn handle_set_issue_state(
+    IncomingSetIssueState { issue_id, state }: IncomingSetIssueState,
+) -> Result<(), Report> {
+    let span = span!(Level::DEBUG, "set_issue_state");
+    let _enter = span.enter();
+    debug!("Incoming SetIssueState");
+    let issue_actor = IssueService::from_registry();
+    let _ = if let Some(user_id) = with_ctx(|act: &mut WsClient, _| act.user_id.clone()) {
+        user_id
+    } else {
+        return Err(eyre!(
+            "Not sure who the user who tried to set issue state is"
+        ));
+    };
+    let resp = issue_actor
+        .send(SpanMessage::new(SetIssueState {
+            issue_id,
+            state: state.to_internal(),
+        }))
+        .await
+        .wrap_err("Error handling incoming set issue state")?;
+
+    // Send event back to client with ALL ISSUES LOL
+    match resp {
+        Ok(i) => {
+            with_ctx(|act: &mut WsClient, ctx| {
+                let res = match i {
+                    Some(issue) => {
+                        let is = Issue {
+                            id: Some(issue.id),
+                            title: issue.title,
+                            description: issue.description,
+                            alternatives: issue
+                                .alternatives
+                                .into_iter()
+                                .map(|alt: db::alternative::InternalAlternative| Alternative {
+                                    id: Some(alt.id),
+                                    title: alt.title,
+                                })
+                                .collect(),
+                            max_voters: Some(issue.max_voters),
+                            show_distribution: issue.show_distribution,
+                            state: Some(issue.state.to_websocket()),
+                            votes: Some(
+                                issue
+                                    .votes
+                                    .into_iter()
+                                    .map(|vote: db::vote::InternalVote| OutgoingVote {
+                                        id: vote.id,
+                                        user_id: vote.user_id,
+                                        alternative_id: vote.alternative_id,
+                                    })
+                                    .collect(),
+                            ),
+                        };
+                        act.send_json(ctx, &OutgoingMessage::Issue(is))
+                            .wrap_err("Failed to send resp after set issue state")
+                        // but i want )?; and not big giant yellow squiggly
+                    }
+                    None => Ok(()), // we didn't find an issue to update ?
+                };
+                match res {
+                    Ok(_) => debug!("ok!"),
+                    Err(err) => error!("issue update failed: {:?}", err),
+                }
+            });
+            Ok(())
+        }
+
+        _ => Ok(()), // how to handle error hmm
+    }
+}
+
 async fn handle_ws_message(text: String) -> Result<(), Report> {
     let m = serde_json::from_str(&text).wrap_err("JSON decode")?;
     match m {
@@ -411,6 +506,7 @@ async fn handle_ws_message(text: String) -> Result<(), Report> {
         IncomingMessage::CreateIssue(issue) => handle_create_issue(issue).await,
         IncomingMessage::Registration(registration) => handle_registration(registration).await,
         IncomingMessage::ListAllIssues => handle_list_all_issues().await,
+        IncomingMessage::SetIssueState(data) => handle_set_issue_state(data).await,
     }
 }
 
@@ -480,11 +576,7 @@ impl Handler<services::ActiveIssue> for WsClient {
                 id: Some(issue.id),
                 title: issue.title,
                 description: issue.description,
-                state: match issue.state {
-                    db::issue::InternalIssueState::NotStarted => Some(IssueState::NotStarted),
-                    db::issue::InternalIssueState::InProgress => Some(IssueState::InProgress),
-                    db::issue::InternalIssueState::Finished => Some(IssueState::Finished),
-                },
+                state: Some(issue.state.to_websocket()),
                 alternatives: issue
                     .alternatives
                     .into_iter()

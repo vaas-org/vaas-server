@@ -1,7 +1,7 @@
 use super::{alternative::InternalAlternative, DbExecutor};
 use crate::async_message_handler_with_span;
 use crate::span::AsyncSpanHandler;
-use crate::websocket::{Alternative, Issue};
+use crate::websocket::{Alternative, Issue, IssueState};
 use actix::prelude::*;
 use actix_interop::with_ctx;
 use color_eyre::eyre::{Report, WrapErr};
@@ -31,7 +31,28 @@ impl Default for IssueId {
 pub enum InternalIssueState {
     NotStarted,
     InProgress,
+    VotingFinished,
     Finished,
+}
+
+impl InternalIssueState {
+    pub fn to_websocket(self) -> IssueState {
+        return match self {
+            InternalIssueState::NotStarted => crate::websocket::IssueState::NotStarted,
+            InternalIssueState::InProgress => crate::websocket::IssueState::InProgress,
+            InternalIssueState::VotingFinished => crate::websocket::IssueState::VotingFinished,
+            InternalIssueState::Finished => crate::websocket::IssueState::Finished,
+        };
+    }
+
+    fn to_db(self) -> &'static str {
+        return match self {
+            InternalIssueState::NotStarted => "not_started",
+            InternalIssueState::InProgress => "in_progress",
+            InternalIssueState::VotingFinished => "voting_finished",
+            InternalIssueState::Finished => "finished",
+        };
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -124,15 +145,8 @@ async fn insert_issue(
     data: &Issue,
 ) -> Result<InternalIssue, Report> {
     let issue_state = match &data.state {
-        Some(state) => match state {
-            crate::websocket::IssueState::NotStarted => "not_started",
-            // crate::websocket::IssueState::NotStarted => crate::db::issue::InternalIssueState::NotStarted,
-            crate::websocket::IssueState::InProgress => "in_progress",
-            // crate::websocket::IssueState::InProgress => crate::db::issue::InternalIssueState::InProgress,
-            crate::websocket::IssueState::Finished => "finished",
-            // crate::websocket::IssueState::Finished => crate::db::issue::InternalIssueState::Finished,
-        },
-        None => "not_started",
+        Some(state) => state.to_owned().to_internal(),
+        None => InternalIssueState::NotStarted,
     };
 
     // @ToDo: Get available voters
@@ -156,7 +170,7 @@ async fn insert_issue(
                 "#,
         data.title,
         data.description,
-        issue_state,
+        issue_state.to_db(), // why doesnt sqlx fix this :thinking:
         max_voters,
         data.show_distribution
     )
@@ -208,3 +222,47 @@ impl AsyncSpanHandler<NewIssue> for DbExecutor {
     }
 }
 crate::span_message_async_impl!(NewIssue, DbExecutor);
+
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "Result<InternalIssue, Report>")]
+pub struct DbSetIssueState {
+    pub issue_id: IssueId,
+    pub state: InternalIssueState,
+}
+
+#[async_trait::async_trait]
+impl AsyncSpanHandler<DbSetIssueState> for DbExecutor {
+    #[instrument]
+    async fn handle(_msg: DbSetIssueState) -> Result<InternalIssue, Report> {
+        let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
+        debug!("Setting issue state");
+
+        let issue_id: IssueId = _msg.issue_id;
+
+        let result = sqlx::query_as!(
+            InternalIssue,
+            r#"
+            UPDATE
+                issues
+            SET
+                state = $1
+            WHERE
+                id = $2
+            RETURNING
+                id as "id: _",
+                title as "title: _",
+                description as "description: _",
+                state as "state: _",
+                max_voters as "max_voters: _",
+                show_distribution as "show_distribution: _"
+            "#,
+            _msg.state.to_db(),
+            issue_id.0,
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        Ok(result)
+    }
+}
+crate::span_message_async_impl!(DbSetIssueState, DbExecutor);
