@@ -9,7 +9,7 @@ use crate::{
 use actix::prelude::*;
 use color_eyre::eyre::Report;
 use db::issue::IssueId;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 #[derive(Clone)]
 pub struct InternalIssue {
@@ -177,6 +177,53 @@ impl AsyncSpanHandler<ListAllIssues> for IssueService {
     }
 }
 crate::span_message_async_impl!(ListAllIssues, IssueService);
+
+// @ToDo: Can this really be an Option<>?
+#[derive(Message)]
+#[rtype(result = "Result<Option<InternalIssue>, Report>")]
+pub struct SetIssueState {
+    pub issue_id: IssueId,
+    pub state: InternalIssueState,
+}
+
+#[async_trait::async_trait]
+impl AsyncSpanHandler<SetIssueState> for IssueService {
+    async fn handle(_msg: SetIssueState) -> Result<Option<InternalIssue>, Report> {
+        debug!("Setting issue state");
+        let issue_id = _msg.issue_id;
+        let state = _msg.state;
+        let db_issue: Result<db::issue::InternalIssue, _> = DbExecutor::from_registry()
+            .send(SpanMessage::new(db::issue::DbSetIssueState {
+                issue_id,
+                state,
+            }))
+            .await?;
+
+        let is = match db_issue {
+            Ok(issue) => {
+                debug!("Issue set state for id {:#?}", id = issue.id);
+                //Some(issue)
+                Some(InternalIssue {
+                    id: issue.id,
+                    alternatives: Vec::new(),
+                    description: issue.description,
+                    title: issue.title,
+                    max_voters: issue.max_voters,
+                    show_distribution: issue.show_distribution,
+                    state: issue.state,
+                    votes: Vec::new(),
+                })
+            }
+            Err(err) => {
+                error!("Issue update errored {:?}", err);
+                None
+            }
+        };
+
+        Ok(is)
+    }
+}
+crate::span_message_async_impl!(SetIssueState, IssueService);
 
 impl Supervised for IssueService {}
 impl ArbiterService for IssueService {}

@@ -1,7 +1,7 @@
 use super::{alternative::InternalAlternative, DbExecutor};
 use crate::async_message_handler_with_span;
 use crate::span::AsyncSpanHandler;
-use crate::websocket::{Alternative, Issue};
+use crate::websocket::{Alternative, Issue, IssueState};
 use actix::prelude::*;
 use actix_interop::with_ctx;
 use color_eyre::eyre::{Report, WrapErr};
@@ -222,3 +222,47 @@ impl AsyncSpanHandler<NewIssue> for DbExecutor {
     }
 }
 crate::span_message_async_impl!(NewIssue, DbExecutor);
+
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "Result<InternalIssue, Report>")]
+pub struct DbSetIssueState {
+    pub issue_id: IssueId,
+    pub state: InternalIssueState,
+}
+
+#[async_trait::async_trait]
+impl AsyncSpanHandler<DbSetIssueState> for DbExecutor {
+    #[instrument]
+    async fn handle(_msg: DbSetIssueState) -> Result<InternalIssue, Report> {
+        let pool = with_ctx(|a: &mut DbExecutor, _| a.pool());
+        debug!("Setting issue state");
+
+        let issue_id: IssueId = _msg.issue_id;
+
+        let result = sqlx::query_as!(
+            InternalIssue,
+            r#"
+            UPDATE
+                issues
+            SET
+                state = $1
+            WHERE
+                id = $2
+            RETURNING
+                id as "id: _",
+                title as "title: _",
+                description as "description: _",
+                state as "state: _",
+                max_voters as "max_voters: _",
+                show_distribution as "show_distribution: _"
+            "#,
+            _msg.state.to_db(),
+            issue_id.0,
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        Ok(result)
+    }
+}
+crate::span_message_async_impl!(DbSetIssueState, DbExecutor);
